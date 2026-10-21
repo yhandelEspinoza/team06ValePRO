@@ -1,0 +1,13 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+credenciales.json
+.env
+
+.vscode/
+.idea/
+
+.DS_Store
+Thumbs.db

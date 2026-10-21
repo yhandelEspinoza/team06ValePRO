@@ -1,0 +1,2614 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Dashboard - Vale Provisional</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/estilo.css') }}"
+    >
+
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    >
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        /* FASE 2B - acciones y modales compactos, sin alterar el layout principal */
+        .vp2-acciones {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .vp2-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            min-height: 34px;
+            padding: 7px 10px;
+            border: 1px solid #dbe3ee;
+            border-radius: 8px;
+            background: transparent;
+            color: #334155;
+            font: inherit;
+            font-size: .82rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: border-color .15s ease, background .15s ease, color .15s ease;
+        }
+
+        .vp2-btn:hover {
+            border-color: #93c5fd;
+            background: rgba(37, 99, 235, .06);
+        }
+
+        .vp2-btn-detalle { color: #2563eb; }
+        .vp2-btn-firma { color: #7c3aed; }
+
+        .vp2-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(15, 23, 42, .62);
+            backdrop-filter: blur(4px);
+        }
+
+        .vp2-modal.vp2-activo { display: flex; }
+
+        .vp2-modal-card {
+            width: min(720px, 100%);
+            max-height: 88vh;
+            overflow: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            background: #ffffff;
+            color: #0f172a;
+            box-shadow: 0 24px 70px rgba(15, 23, 42, .28);
+        }
+
+        .vp2-modal-card.vp2-firma-card {
+            width: min(820px, 100%);
+        }
+
+        .vp2-modal-head {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 18px;
+            padding: 18px 20px;
+            border-bottom: 1px solid #e2e8f0;
+            background: inherit;
+        }
+
+        .vp2-modal-head h3 {
+            margin: 3px 0 0;
+            font-size: 1.12rem;
+        }
+
+        .vp2-kicker {
+            display: block;
+            color: #2563eb;
+            font-size: .7rem;
+            font-weight: 800;
+            letter-spacing: .08em;
+        }
+
+        .vp2-cerrar {
+            width: 36px;
+            height: 36px;
+            flex: 0 0 auto;
+            border: 0;
+            border-radius: 9px;
+            background: #f1f5f9;
+            color: #334155;
+            cursor: pointer;
+        }
+
+        .vp2-body { padding: 20px; }
+
+        .vp2-resumen-superior {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            padding-bottom: 16px;
+            margin-bottom: 4px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .vp2-codigo-principal {
+            display: block;
+            margin-top: 3px;
+            font-size: 1.15rem;
+            color: #0f172a;
+        }
+
+        .vp2-estado-principal {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 9px;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-size: .75rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .vp2-seccion {
+            padding: 16px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .vp2-seccion:last-child {
+            padding-bottom: 0;
+            border-bottom: 0;
+        }
+
+        .vp2-seccion-titulo {
+            margin: 0 0 12px;
+            color: #64748b;
+            font-size: .72rem;
+            font-weight: 800;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .vp2-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            column-gap: 28px;
+            row-gap: 14px;
+        }
+
+        .vp2-campo { min-width: 0; }
+
+        .vp2-campo span {
+            display: block;
+            margin-bottom: 3px;
+            color: #64748b;
+            font-size: .72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .035em;
+        }
+
+        .vp2-campo strong,
+        .vp2-campo p {
+            margin: 0;
+            color: #0f172a;
+            font-size: .93rem;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }
+
+        .vp2-full { grid-column: 1 / -1; }
+
+        .vp2-firma-resumen {
+            margin-bottom: 16px;
+        }
+
+        .vp2-firma-nombre {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 1rem;
+            color: #0f172a;
+        }
+
+        .vp2-firma-linea {
+            color: #64748b;
+            font-size: .86rem;
+            line-height: 1.5;
+        }
+
+        .vp2-firma-linea strong {
+            color: #334155;
+            font-weight: 700;
+        }
+
+        .vp2-visor {
+            width: 100%;
+            min-height: 400px;
+            overflow: hidden;
+            border: 1px solid #dbe3ee;
+            border-radius: 12px;
+            background: #f8fafc;
+        }
+
+        .vp2-visor iframe {
+            width: 100%;
+            min-height: 400px;
+            border: 0;
+            background: #ffffff;
+        }
+
+        .vp2-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            margin-top: 12px;
+            color: #2563eb;
+            font-size: .86rem;
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .vp2-link:hover { text-decoration: underline; }
+        body.vp2-modal-open { overflow: hidden; }
+
+        body.modo-oscuro .vp2-btn {
+            border-color: #2b3a50;
+            color: #cbd5e1;
+        }
+
+        body.modo-oscuro .vp2-btn:hover {
+            border-color: #475569;
+            background: rgba(148, 163, 184, .08);
+        }
+
+        body.modo-oscuro .vp2-btn-detalle { color: #93c5fd; }
+        body.modo-oscuro .vp2-btn-firma { color: #c4b5fd; }
+
+        body.modo-oscuro .vp2-modal-card {
+            background: #111827;
+            border-color: #263244;
+            color: #e5e7eb;
+        }
+
+        body.modo-oscuro .vp2-modal-head,
+        body.modo-oscuro .vp2-resumen-superior,
+        body.modo-oscuro .vp2-seccion {
+            border-color: #263244;
+        }
+
+        body.modo-oscuro .vp2-cerrar {
+            background: #1f2937;
+            color: #e5e7eb;
+        }
+
+        body.modo-oscuro .vp2-codigo-principal,
+        body.modo-oscuro .vp2-campo strong,
+        body.modo-oscuro .vp2-campo p,
+        body.modo-oscuro .vp2-firma-nombre {
+            color: #e5e7eb;
+        }
+
+        body.modo-oscuro .vp2-estado-principal {
+            background: rgba(37, 99, 235, .15);
+            color: #93c5fd;
+        }
+
+        body.modo-oscuro .vp2-seccion-titulo,
+        body.modo-oscuro .vp2-campo span,
+        body.modo-oscuro .vp2-firma-linea {
+            color: #94a3b8;
+        }
+
+        body.modo-oscuro .vp2-firma-linea strong { color: #cbd5e1; }
+
+        body.modo-oscuro .vp2-visor {
+            background: #172033;
+            border-color: #263244;
+        }
+
+        @media (max-width: 760px) {
+            .vp2-modal { padding: 12px; }
+            .vp2-body { padding: 16px; }
+            .vp2-grid { grid-template-columns: 1fr; }
+            .vp2-full { grid-column: auto; }
+            .vp2-resumen-superior { flex-direction: column; }
+        }
+    </style>
+</head>
+
+
+<body>
+
+    <main class="contenedor">
+
+        <!-- =====================================================
+             ENCABEZADO
+        ====================================================== -->
+
+        <header class="encabezado">
+
+            <div class="encabezado-titulo">
+
+                <span class="etiqueta-superior">
+                    PANEL ADMINISTRATIVO
+                </span>
+
+                <h1>
+                    Dashboard de Vale Provisional
+                </h1>
+
+                <p>
+                    Seguimiento de solicitudes, estados,
+                    áreas, categorías y montos.
+                </p>
+
+            </div>
+
+
+            <div class="encabezado-derecha">
+
+                <div class="estado-conexion">
+
+                    {% if conexion_correcta %}
+
+                    <span class="estado correcto">
+                        <i class="bi bi-cloud-check"></i>
+                        Google Sheets conectado
+                    </span>
+
+                    {% else %}
+
+                    <span class="estado error">
+                        <i class="bi bi-cloud-slash"></i>
+                        Error de conexión
+                    </span>
+
+                    {% endif %}
+
+
+                    <small>
+                        <i class="bi bi-clock"></i>
+
+                        Última actualización:
+                        {{ ultima_actualizacion }}
+                    </small>
+
+                </div>
+
+
+                <button
+                    id="botonTema"
+                    class="boton-tema"
+                    type="button"
+                    aria-label="Cambiar tema"
+                    title="Cambiar tema"
+                >
+
+                    <i class="bi bi-moon-stars"></i>
+
+                </button>
+
+            </div>
+
+        </header>
+
+
+
+        {% if error %}
+
+        <section class="mensaje-error">
+
+            <i class="bi bi-exclamation-triangle"></i>
+
+            <div>
+                <strong>
+                    Error de conexión
+                </strong>
+
+                <p>
+                    {{ error }}
+                </p>
+            </div>
+
+        </section>
+
+        {% endif %}
+
+
+
+        <!-- =====================================================
+             INDICADORES
+        ====================================================== -->
+
+        <section class="seccion">
+
+            <div class="titulo-seccion">
+
+                <div>
+
+                    <span class="mini-titulo">
+                        RESUMEN
+                    </span>
+
+                    <h2>
+                        Indicadores principales
+                    </h2>
+
+                </div>
+
+            </div>
+
+
+            <div class="grid-indicadores">
+
+
+                <article class="tarjeta tarjeta-total">
+
+                    <div class="icono-kpi">
+                        <i class="bi bi-file-earmark-text"></i>
+                    </div>
+
+                    <div class="contenido-kpi">
+
+                        <span>
+                            Total de solicitudes
+                        </span>
+
+                        <strong>
+                            {{ indicadores.total_solicitudes }}
+                        </strong>
+
+                    </div>
+
+                </article>
+
+
+
+                <article class="tarjeta tarjeta-firma">
+
+                    <div class="icono-kpi">
+                        <i class="bi bi-pen"></i>
+                    </div>
+
+                    <div class="contenido-kpi">
+
+                        <span>
+                            Pendiente de firma
+                        </span>
+
+                        <strong>
+                            {{ indicadores.pendiente_firma }}
+                        </strong>
+
+                    </div>
+
+                </article>
+
+
+
+                <article class="tarjeta tarjeta-jefe">
+
+                    <div class="icono-kpi">
+                        <i class="bi bi-person-check"></i>
+                    </div>
+
+                    <div class="contenido-kpi">
+
+                        <span>
+                            Pendiente de jefe
+                        </span>
+
+                        <strong>
+                            {{ indicadores.pendiente_jefe }}
+                        </strong>
+
+                    </div>
+
+                </article>
+
+
+
+                <article class="tarjeta tarjeta-aprobado">
+
+                    <div class="icono-kpi">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+
+                    <div class="contenido-kpi">
+
+                        <span>
+                            Aprobadas
+                        </span>
+
+                        <strong>
+                            {{ indicadores.aprobadas }}
+                        </strong>
+
+                    </div>
+
+                </article>
+
+
+
+                <article class="tarjeta tarjeta-rechazado">
+
+                    <div class="icono-kpi">
+                        <i class="bi bi-x-circle"></i>
+                    </div>
+
+                    <div class="contenido-kpi">
+
+                        <span>
+                            Rechazadas
+                        </span>
+
+                        <strong>
+                            {{ indicadores.rechazadas }}
+                        </strong>
+
+                    </div>
+
+                </article>
+
+
+
+                <article class="tarjeta tarjeta-monto">
+
+                    <div class="icono-kpi">
+                        <i class="bi bi-cash-stack"></i>
+                    </div>
+
+                    <div class="contenido-kpi">
+
+                        <span>
+                            Monto total solicitado
+                        </span>
+
+                        <strong>
+                            S/
+                            {{ "{:,.2f}".format(
+                                indicadores.monto_total
+                            ) }}
+                        </strong>
+
+                    </div>
+
+                </article>
+
+
+
+                <article class="tarjeta tarjeta-promedio">
+
+                    <div class="icono-kpi">
+                        <i class="bi bi-calculator"></i>
+                    </div>
+
+                    <div class="contenido-kpi">
+
+                        <span>
+                            Monto promedio
+                        </span>
+
+                        <strong>
+                            S/
+                            {{ "{:,.2f}".format(
+                                indicadores.monto_promedio
+                            ) }}
+                        </strong>
+
+                    </div>
+
+                </article>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =====================================================
+             DESTACADOS
+        ====================================================== -->
+
+        <section class="seccion">
+
+            <div class="titulo-seccion">
+
+                <div>
+
+                    <span class="mini-titulo">
+                        ANÁLISIS
+                    </span>
+
+                    <h2>
+                        Resumen destacado
+                    </h2>
+
+                </div>
+
+            </div>
+
+
+            <div class="grid-destacados">
+
+
+                <article class="tarjeta destacado">
+
+                    <div class="icono-destacado">
+                        <i class="bi bi-bar-chart"></i>
+                    </div>
+
+                    <div>
+
+                        <span>
+                            Estado predominante
+                        </span>
+
+                        <strong>
+                            {{ destacados.estado_predominante }}
+                        </strong>
+
+                        <small>
+                            {{ destacados.cantidad_estado }}
+                            solicitudes
+                        </small>
+
+                    </div>
+
+                </article>
+
+
+
+                <article class="tarjeta destacado">
+
+                    <div class="icono-destacado">
+                        <i class="bi bi-building"></i>
+                    </div>
+
+                    <div>
+
+                        <span>
+                            Área con más solicitudes
+                        </span>
+
+                        <strong>
+                            {{ destacados.area_principal }}
+                        </strong>
+
+                        <small>
+                            {{ destacados.cantidad_area }}
+                            solicitudes
+                        </small>
+
+                    </div>
+
+                </article>
+
+
+
+                <article class="tarjeta destacado">
+
+                    <div class="icono-destacado">
+                        <i class="bi bi-tags"></i>
+                    </div>
+
+                    <div>
+
+                        <span>
+                            Categoría más usada
+                        </span>
+
+                        <strong>
+                            {{ destacados.categoria_principal }}
+                        </strong>
+
+                        <small>
+                            {{ destacados.cantidad_categoria }}
+                            solicitudes
+                        </small>
+
+                    </div>
+
+                </article>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =====================================================
+             DATOS PARA GRÁFICOS
+        ====================================================== -->
+
+        <div
+            id="datos-dashboard"
+
+            data-estados-labels='{{ estados_labels | tojson }}'
+            data-estados-valores='{{ estados_valores | tojson }}'
+
+            data-areas-labels='{{ areas_labels | tojson }}'
+            data-areas-valores='{{ areas_valores | tojson }}'
+
+            data-categorias-labels='{{ categorias_labels | tojson }}'
+            data-categorias-valores='{{ categorias_valores | tojson }}'
+
+            data-montos-labels='{{ montos_categoria_labels | tojson }}'
+            data-montos-valores='{{ montos_categoria_valores | tojson }}'
+        ></div>
+
+
+
+        <!-- =====================================================
+             GRÁFICOS
+        ====================================================== -->
+
+        <section class="seccion">
+
+            <div class="titulo-seccion">
+
+                <div>
+
+                    <span class="mini-titulo">
+                        VISUALIZACIÓN
+                    </span>
+
+                    <h2>
+                        Gráficos
+                    </h2>
+
+                </div>
+
+            </div>
+
+
+            <div class="grid-graficos">
+
+
+                <article class="grafico">
+
+                    <div class="grafico-titulo">
+
+                        <div class="grafico-icono">
+                            <i class="bi bi-bar-chart-fill"></i>
+                        </div>
+
+                        <div>
+
+                            <h3>
+                                Solicitudes por estado
+                            </h3>
+
+                            <p>
+                                Comparación de solicitudes
+                                según su estado actual.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="canvas-contenedor">
+                        <canvas id="graficoEstados"></canvas>
+                    </div>
+
+                </article>
+
+
+
+                <article class="grafico">
+
+                    <div class="grafico-titulo">
+
+                        <div class="grafico-icono">
+                            <i class="bi bi-pie-chart-fill"></i>
+                        </div>
+
+                        <div>
+
+                            <h3>
+                                Distribución de estados
+                            </h3>
+
+                            <p>
+                                Participación porcentual
+                                de cada estado.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="canvas-contenedor">
+                        <canvas id="graficoDistribucion"></canvas>
+                    </div>
+
+                </article>
+
+
+
+                <article class="grafico">
+
+                    <div class="grafico-titulo">
+
+                        <div class="grafico-icono">
+                            <i class="bi bi-buildings-fill"></i>
+                        </div>
+
+                        <div>
+
+                            <h3>
+                                Solicitudes por área
+                            </h3>
+
+                            <p>
+                                Cantidad de solicitudes
+                                registradas por área.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="canvas-contenedor">
+                        <canvas id="graficoAreas"></canvas>
+                    </div>
+
+                </article>
+
+
+
+                <article class="grafico">
+
+                    <div class="grafico-titulo">
+
+                        <div class="grafico-icono">
+                            <i class="bi bi-currency-exchange"></i>
+                        </div>
+
+                        <div>
+
+                            <h3>
+                                Monto por categoría
+                            </h3>
+
+                            <p>
+                                Total solicitado
+                                según categoría.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="canvas-contenedor">
+                        <canvas id="graficoMontos"></canvas>
+                    </div>
+
+                </article>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =====================================================
+             TABLA
+        ====================================================== -->
+
+        <section class="seccion">
+
+            <div class="cabecera-tabla">
+
+                <div>
+
+                    <span class="mini-titulo">
+                        REGISTROS
+                    </span>
+
+                    <h2>
+                        Solicitudes registradas
+                    </h2>
+
+                    <p>
+                        Consulta y filtra los vales
+                        registrados actualmente.
+                    </p>
+
+                </div>
+
+
+                <span id="contador-resultados"></span>
+
+            </div>
+
+
+
+            <div class="controles">
+
+                <div class="campo-busqueda">
+
+                    <i class="bi bi-search"></i>
+
+                    <input
+                        type="search"
+                        id="buscador"
+                        placeholder="Buscar código, solicitante, área o categoría..."
+                    >
+
+                </div>
+
+
+
+                <select id="filtroEstado">
+
+                    <option value="">
+                        Todos los estados
+                    </option>
+
+                    {% for estado in estados_labels %}
+
+                    <option value="{{ estado }}">
+                        {{ estado }}
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+
+
+                <select id="filtroArea">
+
+                    <option value="">
+                        Todas las áreas
+                    </option>
+
+                    {% for area in areas_labels %}
+
+                    <option value="{{ area }}">
+                        {{ area }}
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+
+
+                <select id="filtroCategoria">
+
+                    <option value="">
+                        Todas las categorías
+                    </option>
+
+                    {% for categoria in categorias_labels %}
+
+                    <option value="{{ categoria }}">
+                        {{ categoria }}
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+
+
+                <button
+                    type="button"
+                    id="botonLimpiar"
+                >
+
+                    <i class="bi bi-arrow-counterclockwise"></i>
+
+                    Limpiar
+
+                </button>
+
+            </div>
+
+
+
+            <div class="tabla-responsive">
+
+                <table id="tablaSolicitudes">
+
+                    <thead>
+
+                        <tr>
+                            <th>Código</th>
+                            <th>Registro</th>
+                            <th>Estado</th>
+                            <th>Solicitante</th>
+                            <th>Área</th>
+                            <th>Categoría</th>
+                            <th>Monto</th>
+                            <th>Uso previsto</th>
+                            <th>Firma</th>
+                            <th>Acciones</th>
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                        {% for registro in registros %}
+
+                        <tr
+                            data-codigo="{{ registro.get('Código', '') | lower }}"
+                            data-solicitante="{{ registro.get('Solicitante', '') | lower }}"
+                            data-area="{{ registro.get('Área', '') | lower }}"
+                            data-categoria="{{ registro.get('Categoría', '') | lower }}"
+                            data-estado="{{ registro.get('Estado', '') | lower }}"
+                        >
+
+                            <td class="codigo-vale">
+
+                                {{ registro.get(
+                                    'Código',
+                                    ''
+                                ) }}
+
+                            </td>
+
+
+                            <td>
+
+                                {{ registro.get(
+                                    'Registro',
+                                    ''
+                                ) }}
+
+                            </td>
+
+
+                            <td>
+
+                                {% set estado =
+                                    registro.get(
+                                        'Estado',
+                                        ''
+                                    )
+                                %}
+
+
+                                <span
+                                    class="badge-estado
+                                    {% if estado == 'PENDIENTE FIRMA' %}
+                                        badge-firma
+                                    {% elif estado == 'PENDIENTE JEFE' %}
+                                        badge-jefe
+                                    {% elif estado == 'PENDIENTE ADMIN' %}
+                                        badge-admin
+                                    {% elif estado == 'APROBADO' %}
+                                        badge-aprobado
+                                    {% elif estado == 'RECHAZADO' %}
+                                        badge-rechazado
+                                    {% elif estado == 'CERRADO' %}
+                                        badge-cerrado
+                                    {% else %}
+                                        badge-general
+                                    {% endif %}
+                                    "
+                                >
+
+                                    <span class="punto-estado"></span>
+
+                                    {{ estado }}
+
+                                </span>
+
+                            </td>
+
+
+                            <td>
+
+                                {{ registro.get(
+                                    'Solicitante',
+                                    ''
+                                ) }}
+
+                            </td>
+
+
+                            <td>
+
+                                {{ registro.get(
+                                    'Área',
+                                    ''
+                                ) }}
+
+                            </td>
+
+
+                            <td>
+
+                                {{ registro.get(
+                                    'Categoría',
+                                    ''
+                                ) }}
+
+                            </td>
+
+
+                            <td class="monto-tabla">
+
+                                {{ registro.get(
+                                    'Monto',
+                                    ''
+                                ) }}
+
+                            </td>
+
+
+                            <td>
+
+                                {{ registro.get(
+                                    'Uso previsto',
+                                    ''
+                                ) }}
+
+                            </td>
+
+
+                            <td>
+
+                                {% if registro.get('firma_disponible', False) %}
+
+                                <span class="firma-registrada">
+                                    <i class="bi bi-check-circle-fill"></i>
+                                    Sí
+                                </span>
+
+                                {% else %}
+
+                                <span class="firma-pendiente">
+                                    <i class="bi bi-clock"></i>
+                                    Pendiente
+                                </span>
+
+                                {% endif %}
+
+                            </td>
+
+                            <td>
+                                <div class="vp2-acciones">
+                                    <button
+                                        type="button"
+                                        class="vp2-btn vp2-btn-detalle js-vp2-detalle"
+                                        data-codigo="{{ registro.get('Código', '') }}"
+                                        data-estado="{{ registro.get('Estado', '') }}"
+                                        data-solicitante="{{ registro.get('Solicitante', '') }}"
+                                        data-nombres="{{ registro.get('Nombres', '') }}"
+                                        data-apellidos="{{ registro.get('Apellidos', '') }}"
+                                        data-documento="{{ registro.get('DNI / CE', '') }}"
+                                        data-correo="{{ registro.get('Correo', '') }}"
+                                        data-cargo="{{ registro.get('Cargo', '') }}"
+                                        data-area="{{ registro.get('Área', '') }}"
+                                        data-centro-costo="{{ registro.get('Centro costo', '') }}"
+                                        data-categoria="{{ registro.get('Categoría', '') }}"
+                                        data-monto="{{ registro.get('Monto', '') }}"
+                                        data-uso="{{ registro.get('Uso previsto', '') }}"
+                                        data-registro="{{ registro.get('Registro', '') }}"
+                                        data-firma-estado="{{ 'Sí' if registro.get('firma_disponible', False) else 'Pendiente' }}"
+                                        data-motivo="{{ registro.get('Motivo', '') }}"
+                                    >
+                                        <i class="bi bi-eye"></i> Detalle
+                                    </button>
+
+                                    {% if registro.get('firma_disponible', False) %}
+                                    <button
+                                        type="button"
+                                        class="vp2-btn vp2-btn-firma js-vp2-firma"
+                                        data-codigo="{{ registro.get('Código', '') }}"
+                                        data-solicitante="{{ registro.get('Solicitante', '') }}"
+                                        data-firma-url="{{ registro.get('firma_url', '') }}"
+                                        data-firma-tipo="{{ registro.get('firma_tipo', '') }}"
+                                        data-firma-estado="{{ registro.get('firma_estado', '') }}"
+                                        data-firma-registro="{{ registro.get('firma_registro', '') }}"
+                                    >
+                                        <i class="bi bi-pen"></i> Firma
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+
+
+
+    <!-- FASE 2B - MODALES COMPACTOS -->
+    <div id="vp2ModalDetalle" class="vp2-modal" role="dialog" aria-modal="true" aria-labelledby="vp2DetalleTitulo">
+        <div class="vp2-modal-card">
+            <div class="vp2-modal-head">
+                <div>
+                    <span class="vp2-kicker">VALE PROVISIONAL</span>
+                    <h3 id="vp2DetalleTitulo">Detalle de solicitud</h3>
+                </div>
+                <button type="button" class="vp2-cerrar js-vp2-cerrar" aria-label="Cerrar">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+
+            <div class="vp2-body">
+                <div class="vp2-resumen-superior">
+                    <div>
+                        <span class="vp2-kicker">CÓDIGO</span>
+                        <strong id="vp2dCodigo" class="vp2-codigo-principal">-</strong>
+                    </div>
+                    <strong id="vp2dEstado" class="vp2-estado-principal">-</strong>
+                </div>
+
+                <section class="vp2-seccion">
+                    <h4 class="vp2-seccion-titulo">Solicitante</h4>
+                    <div class="vp2-grid">
+                        <div class="vp2-campo">
+                            <span>Solicitante</span>
+                            <strong id="vp2dSolicitante">-</strong>
+                        </div>
+                        <div class="vp2-campo">
+                            <span>Nombres y apellidos</span>
+                            <strong id="vp2dNombre">-</strong>
+                        </div>
+                        <div class="vp2-campo">
+                            <span>DNI / CE</span>
+                            <strong id="vp2dDocumento">-</strong>
+                        </div>
+                        <div class="vp2-campo">
+                            <span>Correo</span>
+                            <strong id="vp2dCorreo">-</strong>
+                        </div>
+                        <div class="vp2-campo">
+                            <span>Cargo</span>
+                            <strong id="vp2dCargo">-</strong>
+                        </div>
+                        <div class="vp2-campo">
+                            <span>Área / Unidad</span>
+                            <strong id="vp2dArea">-</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="vp2-seccion">
+                    <h4 class="vp2-seccion-titulo">Datos del vale</h4>
+                    <div class="vp2-grid">
+                        <div class="vp2-campo">
+                            <span>Centro de costo</span>
+                            <strong id="vp2dCentro">-</strong>
+                        </div>
+                        <div class="vp2-campo">
+                            <span>Categoría</span>
+                            <strong id="vp2dCategoria">-</strong>
+                        </div>
+                        <div class="vp2-campo">
+                            <span>Monto solicitado</span>
+                            <strong id="vp2dMonto">-</strong>
+                        </div>
+                        <div class="vp2-campo">
+                            <span>Uso previsto</span>
+                            <strong id="vp2dUso">-</strong>
+                        </div>
+                        <div class="vp2-campo">
+                            <span>Firma</span>
+                            <strong id="vp2dFirma">-</strong>
+                        </div>
+                        <div class="vp2-campo">
+                            <span>Registro</span>
+                            <strong id="vp2dRegistro">-</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="vp2-seccion">
+                    <h4 class="vp2-seccion-titulo">Motivo</h4>
+                    <div class="vp2-campo">
+                        <p id="vp2dMotivo">-</p>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <div id="vp2ModalFirma" class="vp2-modal" role="dialog" aria-modal="true" aria-labelledby="vp2FirmaTitulo">
+        <div class="vp2-modal-card vp2-firma-card">
+            <div class="vp2-modal-head">
+                <div>
+                    <span class="vp2-kicker">FIRMA DEL VALE</span>
+                    <h3 id="vp2FirmaTitulo">Firma registrada</h3>
+                </div>
+                <button type="button" class="vp2-cerrar js-vp2-cerrar" aria-label="Cerrar">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+
+            <div class="vp2-body">
+                <div class="vp2-firma-resumen">
+                    <span class="vp2-kicker">CÓDIGO</span>
+                    <strong id="vp2fCodigo" class="vp2-codigo-principal">-</strong>
+                    <strong id="vp2fSolicitante" class="vp2-firma-nombre">-</strong>
+                    <div class="vp2-firma-linea">
+                        <strong id="vp2fTipo">-</strong>
+                        · <span id="vp2fEstado">-</span>
+                        · <span id="vp2fRegistro">-</span>
+                    </div>
+                </div>
+
+                <div class="vp2-visor">
+                    <iframe id="vp2FirmaFrame" title="Vista previa de firma" loading="lazy"></iframe>
+                </div>
+
+                <a id="vp2FirmaLink" class="vp2-link" href="#" target="_blank" rel="noopener noreferrer">
+                    <i class="bi bi-box-arrow-up-right"></i>
+                    Abrir original
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         JAVASCRIPT
+    ========================================================== -->
+
+    <script>
+
+        /* =====================================================
+           TEMA CLARO / OSCURO
+        ====================================================== */
+
+        const botonTema =
+            document.getElementById(
+                "botonTema"
+            );
+
+
+        function aplicarTemaGuardado() {
+
+            const temaGuardado =
+                localStorage.getItem(
+                    "temaDashboard"
+                );
+
+
+            if (
+                temaGuardado === "oscuro"
+            ) {
+
+                document.body.classList.add(
+                    "modo-oscuro"
+                );
+
+            }
+
+        }
+
+
+        function actualizarIconoTema() {
+
+            const oscuro =
+                document.body.classList.contains(
+                    "modo-oscuro"
+                );
+
+
+            botonTema.innerHTML =
+                oscuro
+
+                    ? '<i class="bi bi-sun-fill"></i>'
+
+                    : '<i class="bi bi-moon-stars-fill"></i>';
+
+
+            botonTema.title =
+                oscuro
+
+                    ? "Cambiar a modo claro"
+
+                    : "Cambiar a modo oscuro";
+
+        }
+
+
+        aplicarTemaGuardado();
+
+        actualizarIconoTema();
+
+
+
+        botonTema.addEventListener(
+
+            "click",
+
+            function() {
+
+                document.body.classList.toggle(
+                    "modo-oscuro"
+                );
+
+
+                const oscuro =
+                    document.body.classList.contains(
+                        "modo-oscuro"
+                    );
+
+
+                localStorage.setItem(
+
+                    "temaDashboard",
+
+                    oscuro
+                        ? "oscuro"
+                        : "claro"
+
+                );
+
+
+                actualizarIconoTema();
+
+                actualizarColoresGraficos();
+
+            }
+
+        );
+
+
+
+        /* =====================================================
+           DATOS
+        ====================================================== */
+
+        const datosDashboard =
+            document.getElementById(
+                "datos-dashboard"
+            );
+
+
+        const estadosLabels = JSON.parse(
+            datosDashboard.dataset.estadosLabels
+        );
+
+
+        const estadosValores = JSON.parse(
+            datosDashboard.dataset.estadosValores
+        );
+
+
+        const areasLabels = JSON.parse(
+            datosDashboard.dataset.areasLabels
+        );
+
+
+        const areasValores = JSON.parse(
+            datosDashboard.dataset.areasValores
+        );
+
+
+        const montosLabels = JSON.parse(
+            datosDashboard.dataset.montosLabels
+        );
+
+
+        const montosValores = JSON.parse(
+            datosDashboard.dataset.montosValores
+        );
+
+
+
+        /* =====================================================
+           COLORES DE ESTADO
+        ====================================================== */
+
+        const COLORES_ESTADO = {
+
+            "PENDIENTE FIRMA":
+                "#d97706",
+
+            "PENDIENTE JEFE":
+                "#0ea5e9",
+
+            "PENDIENTE ADMIN":
+                "#7c3aed",
+
+            "APROBADO":
+                "#16a34a",
+
+            "RECHAZADO":
+                "#dc2626",
+
+            "CERRADO":
+                "#475569",
+
+            "DESEMBOLSADO":
+                "#2563eb",
+
+            "EN RENDICIÓN":
+                "#ca8a04"
+
+        };
+
+
+        function obtenerColorEstado(
+            estado
+        ) {
+
+            return (
+                COLORES_ESTADO[estado]
+                ||
+                "#2563eb"
+            );
+
+        }
+
+
+        const coloresEstados =
+            estadosLabels.map(
+                obtenerColorEstado
+            );
+
+
+
+        const coloresAreas = [
+
+            "#2563eb",
+            "#0ea5e9",
+            "#7c3aed",
+            "#16a34a",
+            "#d97706",
+            "#dc2626",
+            "#0891b2",
+            "#475569"
+
+        ];
+
+
+
+        const coloresMontos = [
+
+            "#7c3aed",
+            "#2563eb",
+            "#0ea5e9",
+            "#16a34a",
+            "#d97706",
+            "#dc2626"
+
+        ];
+
+
+
+        /* =====================================================
+           COLORES DINÁMICOS PARA GRÁFICOS
+        ====================================================== */
+
+        function colorTextoGrafico() {
+
+            return document.body.classList.contains(
+                "modo-oscuro"
+            )
+                ? "#cbd5e1"
+                : "#64748b";
+
+        }
+
+
+        function colorGridGrafico() {
+
+            return document.body.classList.contains(
+                "modo-oscuro"
+            )
+                ? "#263244"
+                : "#eef2f7";
+
+        }
+
+
+        function colorBordeDona() {
+
+            return document.body.classList.contains(
+                "modo-oscuro"
+            )
+                ? "#111827"
+                : "#ffffff";
+
+        }
+
+
+
+        Chart.defaults.font.family =
+            "'Segoe UI', Arial, sans-serif";
+
+
+        Chart.defaults.color =
+            colorTextoGrafico();
+
+
+
+        /* =====================================================
+           GRÁFICO ESTADOS
+        ====================================================== */
+
+        const graficoEstados = new Chart(
+
+            document.getElementById(
+                "graficoEstados"
+            ),
+
+            {
+
+                type: "bar",
+
+                data: {
+
+                    labels:
+                        estadosLabels,
+
+                    datasets: [
+
+                        {
+
+                            label:
+                                "Solicitudes",
+
+                            data:
+                                estadosValores,
+
+                            backgroundColor:
+                                coloresEstados,
+
+                            borderRadius:
+                                8,
+
+                            borderSkipped:
+                                false,
+
+                            maxBarThickness:
+                                58
+
+                        }
+
+                    ]
+
+                },
+
+
+                options: {
+
+                    responsive:
+                        true,
+
+                    maintainAspectRatio:
+                        false,
+
+                    animation: {
+                        duration: 850,
+                        easing: "easeOutQuart"
+                    },
+
+
+                    plugins: {
+
+                        legend: {
+                            display: false
+                        },
+
+                        tooltip: {
+
+                            backgroundColor:
+                                "#172033",
+
+                            padding:
+                                12,
+
+                            cornerRadius:
+                                8
+
+                        }
+
+                    },
+
+
+                    scales: {
+
+                        x: {
+
+                            ticks: {
+                                color:
+                                    colorTextoGrafico()
+                            },
+
+                            grid: {
+                                display: false
+                            },
+
+                            border: {
+                                display: false
+                            }
+
+                        },
+
+                        y: {
+
+                            beginAtZero:
+                                true,
+
+                            ticks: {
+                                precision: 0,
+                                color:
+                                    colorTextoGrafico()
+                            },
+
+                            border: {
+                                display: false
+                            },
+
+                            grid: {
+                                color:
+                                    colorGridGrafico()
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+        );
+
+
+
+        /* =====================================================
+           DISTRIBUCIÓN
+        ====================================================== */
+
+        const graficoDistribucion =
+            new Chart(
+
+                document.getElementById(
+                    "graficoDistribucion"
+                ),
+
+                {
+
+                    type:
+                        "doughnut",
+
+                    data: {
+
+                        labels:
+                            estadosLabels,
+
+                        datasets: [
+
+                            {
+
+                                data:
+                                    estadosValores,
+
+                                backgroundColor:
+                                    coloresEstados,
+
+                                borderColor:
+                                    colorBordeDona(),
+
+                                borderWidth:
+                                    4,
+
+                                hoverOffset:
+                                    8
+
+                            }
+
+                        ]
+
+                    },
+
+
+                    options: {
+
+                        responsive:
+                            true,
+
+                        maintainAspectRatio:
+                            false,
+
+                        cutout:
+                            "64%",
+
+                        animation: {
+                            duration: 900
+                        },
+
+
+                        plugins: {
+
+                            legend: {
+
+                                position:
+                                    "bottom",
+
+                                labels: {
+
+                                    usePointStyle:
+                                        true,
+
+                                    padding:
+                                        18,
+
+                                    color:
+                                        colorTextoGrafico()
+
+                                }
+
+                            },
+
+                            tooltip: {
+
+                                backgroundColor:
+                                    "#172033",
+
+                                padding:
+                                    12
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            );
+
+
+
+        /* =====================================================
+           ÁREAS
+        ====================================================== */
+
+        const graficoAreas =
+            new Chart(
+
+                document.getElementById(
+                    "graficoAreas"
+                ),
+
+                {
+
+                    type:
+                        "bar",
+
+                    data: {
+
+                        labels:
+                            areasLabels,
+
+                        datasets: [
+
+                            {
+
+                                label:
+                                    "Solicitudes",
+
+                                data:
+                                    areasValores,
+
+                                backgroundColor:
+                                    areasLabels.map(
+
+                                        function(
+                                            _,
+                                            index
+                                        ) {
+
+                                            return coloresAreas[
+                                                index
+                                                %
+                                                coloresAreas.length
+                                            ];
+
+                                        }
+
+                                    ),
+
+                                borderRadius:
+                                    8,
+
+                                borderSkipped:
+                                    false,
+
+                                maxBarThickness:
+                                    58
+
+                            }
+
+                        ]
+
+                    },
+
+
+                    options: {
+
+                        responsive:
+                            true,
+
+                        maintainAspectRatio:
+                            false,
+
+                        animation: {
+                            duration: 850
+                        },
+
+                        plugins: {
+
+                            legend: {
+                                display: false
+                            }
+
+                        },
+
+                        scales: {
+
+                            x: {
+
+                                ticks: {
+                                    color:
+                                        colorTextoGrafico()
+                                },
+
+                                grid: {
+                                    display: false
+                                },
+
+                                border: {
+                                    display: false
+                                }
+
+                            },
+
+                            y: {
+
+                                beginAtZero:
+                                    true,
+
+                                ticks: {
+                                    precision: 0,
+                                    color:
+                                        colorTextoGrafico()
+                                },
+
+                                border: {
+                                    display: false
+                                },
+
+                                grid: {
+                                    color:
+                                        colorGridGrafico()
+                                }
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            );
+
+
+
+        /* =====================================================
+           MONTOS
+        ====================================================== */
+
+        const graficoMontos =
+            new Chart(
+
+                document.getElementById(
+                    "graficoMontos"
+                ),
+
+                {
+
+                    type:
+                        "bar",
+
+                    data: {
+
+                        labels:
+                            montosLabels,
+
+                        datasets: [
+
+                            {
+
+                                label:
+                                    "Monto solicitado",
+
+                                data:
+                                    montosValores,
+
+                                backgroundColor:
+                                    montosLabels.map(
+
+                                        function(
+                                            _,
+                                            index
+                                        ) {
+
+                                            return coloresMontos[
+                                                index
+                                                %
+                                                coloresMontos.length
+                                            ];
+
+                                        }
+
+                                    ),
+
+                                borderRadius:
+                                    8,
+
+                                borderSkipped:
+                                    false,
+
+                                maxBarThickness:
+                                    58
+
+                            }
+
+                        ]
+
+                    },
+
+
+                    options: {
+
+                        responsive:
+                            true,
+
+                        maintainAspectRatio:
+                            false,
+
+                        animation: {
+                            duration: 850
+                        },
+
+
+                        plugins: {
+
+                            legend: {
+                                display: false
+                            },
+
+
+                            tooltip: {
+
+                                backgroundColor:
+                                    "#172033",
+
+                                padding:
+                                    12,
+
+                                callbacks: {
+
+                                    label:
+                                        function(
+                                            context
+                                        ) {
+
+                                            return (
+                                                "S/ "
+                                                +
+                                                Number(
+                                                    context.raw
+                                                ).toLocaleString(
+                                                    "es-PE",
+                                                    {
+                                                        minimumFractionDigits:
+                                                            2
+                                                    }
+                                                )
+                                            );
+
+                                        }
+
+                                }
+
+                            }
+
+                        },
+
+
+                        scales: {
+
+                            x: {
+
+                                ticks: {
+                                    color:
+                                        colorTextoGrafico()
+                                },
+
+                                grid: {
+                                    display: false
+                                },
+
+                                border: {
+                                    display: false
+                                }
+
+                            },
+
+
+                            y: {
+
+                                beginAtZero:
+                                    true,
+
+                                ticks: {
+
+                                    color:
+                                        colorTextoGrafico(),
+
+                                    callback:
+                                        function(
+                                            value
+                                        ) {
+
+                                            return (
+                                                "S/ "
+                                                +
+                                                value
+                                            );
+
+                                        }
+
+                                },
+
+                                border: {
+                                    display: false
+                                },
+
+                                grid: {
+                                    color:
+                                        colorGridGrafico()
+                                }
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            );
+
+
+
+        /* =====================================================
+           ACTUALIZAR GRÁFICOS AL CAMBIAR TEMA
+        ====================================================== */
+
+        function actualizarColoresGraficos() {
+
+            Chart.defaults.color =
+                colorTextoGrafico();
+
+
+            graficoEstados.options.scales.x.ticks.color =
+                colorTextoGrafico();
+
+            graficoEstados.options.scales.y.ticks.color =
+                colorTextoGrafico();
+
+            graficoEstados.options.scales.y.grid.color =
+                colorGridGrafico();
+
+
+            graficoDistribucion.options.plugins.legend.labels.color =
+                colorTextoGrafico();
+
+            graficoDistribucion.data.datasets[0].borderColor =
+                colorBordeDona();
+
+
+            graficoAreas.options.scales.x.ticks.color =
+                colorTextoGrafico();
+
+            graficoAreas.options.scales.y.ticks.color =
+                colorTextoGrafico();
+
+            graficoAreas.options.scales.y.grid.color =
+                colorGridGrafico();
+
+
+            graficoMontos.options.scales.x.ticks.color =
+                colorTextoGrafico();
+
+            graficoMontos.options.scales.y.ticks.color =
+                colorTextoGrafico();
+
+            graficoMontos.options.scales.y.grid.color =
+                colorGridGrafico();
+
+
+            graficoEstados.update();
+
+            graficoDistribucion.update();
+
+            graficoAreas.update();
+
+            graficoMontos.update();
+
+        }
+
+
+
+        /* =====================================================
+           FILTROS
+        ====================================================== */
+
+        const buscador =
+            document.getElementById(
+                "buscador"
+            );
+
+
+        const filtroEstado =
+            document.getElementById(
+                "filtroEstado"
+            );
+
+
+        const filtroArea =
+            document.getElementById(
+                "filtroArea"
+            );
+
+
+        const filtroCategoria =
+            document.getElementById(
+                "filtroCategoria"
+            );
+
+
+        const botonLimpiar =
+            document.getElementById(
+                "botonLimpiar"
+            );
+
+
+        const filas =
+            document.querySelectorAll(
+                "#tablaSolicitudes tbody tr"
+            );
+
+
+        const contadorResultados =
+            document.getElementById(
+                "contador-resultados"
+            );
+
+
+
+        function aplicarFiltros() {
+
+            const texto =
+                buscador.value
+                    .toLowerCase()
+                    .trim();
+
+
+            const estadoSeleccionado =
+                filtroEstado.value
+                    .toLowerCase();
+
+
+            const areaSeleccionada =
+                filtroArea.value
+                    .toLowerCase();
+
+
+            const categoriaSeleccionada =
+                filtroCategoria.value
+                    .toLowerCase();
+
+
+            let visibles = 0;
+
+
+
+            filas.forEach(
+
+                function(fila) {
+
+                    const codigo =
+                        fila.dataset.codigo;
+
+
+                    const solicitante =
+                        fila.dataset.solicitante;
+
+
+                    const area =
+                        fila.dataset.area;
+
+
+                    const categoria =
+                        fila.dataset.categoria;
+
+
+                    const estado =
+                        fila.dataset.estado;
+
+
+
+                    const coincideTexto =
+
+                        codigo.includes(texto)
+
+                        ||
+
+                        solicitante.includes(texto)
+
+                        ||
+
+                        area.includes(texto)
+
+                        ||
+
+                        categoria.includes(texto);
+
+
+
+                    const coincideEstado =
+
+                        estadoSeleccionado === ""
+
+                        ||
+
+                        estado ===
+                        estadoSeleccionado;
+
+
+
+                    const coincideArea =
+
+                        areaSeleccionada === ""
+
+                        ||
+
+                        area ===
+                        areaSeleccionada;
+
+
+
+                    const coincideCategoria =
+
+                        categoriaSeleccionada === ""
+
+                        ||
+
+                        categoria ===
+                        categoriaSeleccionada;
+
+
+
+                    const mostrar =
+
+                        coincideTexto
+
+                        &&
+
+                        coincideEstado
+
+                        &&
+
+                        coincideArea
+
+                        &&
+
+                        coincideCategoria;
+
+
+
+                    fila.style.display =
+                        mostrar
+                            ? ""
+                            : "none";
+
+
+                    if (mostrar) {
+                        visibles++;
+                    }
+
+                }
+
+            );
+
+
+            contadorResultados.textContent =
+                visibles
+                +
+                " resultado(s)";
+
+        }
+
+
+
+        buscador.addEventListener(
+            "input",
+            aplicarFiltros
+        );
+
+
+        filtroEstado.addEventListener(
+            "change",
+            aplicarFiltros
+        );
+
+
+        filtroArea.addEventListener(
+            "change",
+            aplicarFiltros
+        );
+
+
+        filtroCategoria.addEventListener(
+            "change",
+            aplicarFiltros
+        );
+
+
+
+        botonLimpiar.addEventListener(
+
+            "click",
+
+            function() {
+
+                buscador.value =
+                    "";
+
+                filtroEstado.value =
+                    "";
+
+                filtroArea.value =
+                    "";
+
+                filtroCategoria.value =
+                    "";
+
+                aplicarFiltros();
+
+            }
+
+        );
+
+
+        aplicarFiltros();
+
+        /* =====================================================
+           FASE 2B - DETALLE Y FIRMA
+        ====================================================== */
+        const vp2ModalDetalle = document.getElementById("vp2ModalDetalle");
+        const vp2ModalFirma = document.getElementById("vp2ModalFirma");
+        const vp2FirmaFrame = document.getElementById("vp2FirmaFrame");
+        const vp2FirmaLink = document.getElementById("vp2FirmaLink");
+
+        function vp2Texto(id, valor) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = String(valor || "").trim() || "-";
+        }
+
+        function vp2Abrir(modal) {
+            modal.classList.add("vp2-activo");
+            document.body.classList.add("vp2-modal-open");
+        }
+
+        function vp2Cerrar(modal) {
+            modal.classList.remove("vp2-activo");
+            if (!document.querySelector(".vp2-modal.vp2-activo")) {
+                document.body.classList.remove("vp2-modal-open");
+            }
+            if (modal === vp2ModalFirma) {
+                vp2FirmaFrame.removeAttribute("src");
+            }
+        }
+
+        function vp2PreviewDrive(url) {
+            const limpio = String(url || "").trim();
+            if (!limpio) return "";
+            const match = limpio.match(/\/file\/d\/([^/]+)/);
+            if (match) return "https://drive.google.com/file/d/" + match[1] + "/preview";
+            return limpio;
+        }
+
+        document.querySelectorAll(".js-vp2-detalle").forEach(function(boton) {
+            boton.addEventListener("click", function() {
+                const d = boton.dataset;
+                vp2Texto("vp2dCodigo", d.codigo);
+                vp2Texto("vp2dEstado", d.estado);
+                vp2Texto("vp2dSolicitante", d.solicitante);
+                vp2Texto("vp2dNombre", ((d.nombres || "") + " " + (d.apellidos || "")).trim());
+                vp2Texto("vp2dDocumento", d.documento);
+                vp2Texto("vp2dCorreo", d.correo);
+                vp2Texto("vp2dCargo", d.cargo);
+                vp2Texto("vp2dArea", d.area);
+                vp2Texto("vp2dCentro", d.centroCosto);
+                vp2Texto("vp2dCategoria", d.categoria);
+                vp2Texto("vp2dMonto", d.monto);
+                vp2Texto("vp2dUso", d.uso);
+                vp2Texto("vp2dRegistro", d.registro);
+                vp2Texto("vp2dFirma", d.firmaEstado);
+                vp2Texto("vp2dMotivo", d.motivo);
+                vp2Abrir(vp2ModalDetalle);
+            });
+        });
+
+        document.querySelectorAll(".js-vp2-firma").forEach(function(boton) {
+            boton.addEventListener("click", function() {
+                const d = boton.dataset;
+                const original = String(d.firmaUrl || "").trim();
+                vp2Texto("vp2fCodigo", d.codigo);
+                vp2Texto("vp2fSolicitante", d.solicitante);
+                vp2Texto("vp2fTipo", d.firmaTipo);
+                vp2Texto("vp2fEstado", d.firmaEstado);
+                vp2Texto("vp2fRegistro", d.firmaRegistro);
+                const preview = vp2PreviewDrive(original);
+                if (preview) vp2FirmaFrame.src = preview;
+                vp2FirmaLink.href = original || "#";
+                vp2FirmaLink.style.display = original ? "inline-flex" : "none";
+                vp2Abrir(vp2ModalFirma);
+            });
+        });
+
+        document.querySelectorAll(".js-vp2-cerrar").forEach(function(boton) {
+            boton.addEventListener("click", function() {
+                vp2Cerrar(boton.closest(".vp2-modal"));
+            });
+        });
+
+        [vp2ModalDetalle, vp2ModalFirma].forEach(function(modal) {
+            modal.addEventListener("click", function(e) {
+                if (e.target === modal) vp2Cerrar(modal);
+            });
+        });
+
+        document.addEventListener("keydown", function(e) {
+            if (e.key !== "Escape") return;
+            if (vp2ModalFirma.classList.contains("vp2-activo")) vp2Cerrar(vp2ModalFirma);
+            else if (vp2ModalDetalle.classList.contains("vp2-activo")) vp2Cerrar(vp2ModalDetalle);
+        });
+
+    </script>
+
+</body>
+
+</html>
