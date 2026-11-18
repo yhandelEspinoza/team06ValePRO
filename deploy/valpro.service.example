@@ -1,0 +1,20 @@
+[Unit]
+Description=VALPRO dashboard
+Wants=network-online.target
+After=network-online.target
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/team06ValePRO
+Environment=VALPRO_DEMO=0
+Environment=VALPRO_CREDENTIALS=/home/ubuntu/team06ValePRO/credenciales.json
+ExecStart=/home/ubuntu/team06ValePRO/venv/bin/gunicorn --bind 127.0.0.1:5000 --workers 2 --timeout 60 --access-logfile - --error-logfile - app:app
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+[Install]
+WantedBy=multi-user.target

@@ -1,256 +1,121 @@
-# ---------------------------------------------------------
-# IMPORTACIÓN DE LIBRERÍAS
-# ---------------------------------------------------------
-
+"""Lecturas de Google Sheets con un cliente y una consulta conjunta por carga."""
 from pathlib import Path
-
+import os
 import gspread
-
+from google.auth.exceptions import GoogleAuthError
+from requests.exceptions import RequestException
 from tabulate import tabulate
 
-
-# ---------------------------------------------------------
-# CONFIGURACIÓN GENERAL
-# ---------------------------------------------------------
-
-SPREADSHEET_ID = "1PV09vawEnQE5wAqj4JZarJUuQIjLhg7Ii7eV2WHzUGI"
-
+BASE_DIR = Path(__file__).resolve().parent
+SPREADSHEET_ID = os.environ.get("VALPRO_SPREADSHEET_ID", "1PV09vawEnQE5wAqj4JZarJUuQIjLhg7Ii7eV2WHzUGI")
+RUTA_CREDENCIALES = Path(os.environ.get("VALPRO_CREDENTIALS", str(BASE_DIR / "credenciales.json")))
 HOJA_SOLICITUDES = "SOLICITUDES"
 HOJA_FIRMAS = "FIRMAS"
+READONLY_SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 
 
-# ---------------------------------------------------------
-# RUTA DEL ARCHIVO DE CREDENCIALES
-# ---------------------------------------------------------
-
-BASE_DIR = Path(__file__).resolve().parent
-
-RUTA_CREDENCIALES = BASE_DIR / "credenciales.json"
+class ErrorSheets(RuntimeError):
+    """Mensaje público seguro; nunca incluye respuesta cruda ni secretos."""
 
 
-# ---------------------------------------------------------
-# CONEXIÓN CON GOOGLE SHEETS
-# ---------------------------------------------------------
+def _mensaje_error(exc):
+    if isinstance(exc, FileNotFoundError):
+        return "No se encontró el archivo de credenciales. Configure VALPRO_CREDENTIALS en el servidor."
+    if isinstance(exc, (GoogleAuthError, ValueError)):
+        return "No se pudo autenticar con Google Sheets. Revise la cuenta de servicio y sus credenciales."
+    if isinstance(exc, (PermissionError, gspread.exceptions.SpreadsheetNotFound)):
+        return "No se puede abrir la hoja. Revise su identificador y compártala con la cuenta de servicio como lector."
+    if isinstance(exc, gspread.exceptions.APIError):
+        codigo = getattr(exc.response, "status_code", None)
+        if codigo in (401, 403):
+            return "Google Sheets rechazó el acceso. Revise permisos y habilitación de la API."
+        if codigo == 429:
+            return "Google Sheets alcanzó su límite de consultas. Espere un momento y vuelva a intentar."
+        if codigo == 400:
+            return "No se pudieron leer SOLICITUDES y FIRMAS. Revise los nombres de las hojas."
+    if isinstance(exc, RequestException):
+        return "No se pudo conectar con Google Sheets dentro del tiempo permitido. Vuelva a intentar."
+    return "Google Sheets no está disponible. Revise la configuración y vuelva a intentar."
+
 
 def conectar_archivo():
-    """
-    Conecta con la hoja principal de Valpro utilizando
-    la cuenta de servicio configurada en credenciales.json.
-    """
+    try:
+        cliente = gspread.service_account(filename=str(RUTA_CREDENCIALES), scopes=READONLY_SCOPES)
+        cliente.set_timeout((5, 15))
+        return cliente.open_by_key(SPREADSHEET_ID)
+    except (OSError, ValueError, GoogleAuthError, RequestException, gspread.exceptions.GSpreadException) as exc:
+        raise ErrorSheets(_mensaje_error(exc)) from None
 
-    if not RUTA_CREDENCIALES.exists():
-        raise FileNotFoundError(
-            f"No se encontró credenciales.json en: {RUTA_CREDENCIALES}"
+
+def _registros(valores, nombre):
+    if not valores:
+        return []
+    encabezados = [str(v).strip() for v in valores[0]]
+    no_vacios = [v for v in encabezados if v]
+    if len(no_vacios) != len(set(no_vacios)):
+        raise ErrorSheets(f"La hoja {nombre} tiene encabezados duplicados.")
+    requeridos = {"Código", "Estado", "Monto", "Área", "Categoría"} if nombre == HOJA_SOLICITUDES else {"Código vale", "URL archivo"}
+    if not requeridos.issubset(encabezados):
+        raise ErrorSheets(f"Faltan columnas requeridas en {nombre}: {', '.join(sorted(requeridos - set(encabezados)))}.")
+    registros = []
+    for fila in valores[1:]:
+        if any(str(v).strip() for v in fila[len(encabezados):]):
+            raise ErrorSheets(f"La hoja {nombre} tiene datos en columnas sin encabezado.")
+        if any(str(v).strip() and not encabezados[i] for i, v in enumerate(fila[:len(encabezados)])):
+            raise ErrorSheets(f"La hoja {nombre} tiene datos en columnas sin encabezado.")
+        registros.append({k: fila[i] if i < len(fila) else "" for i, k in enumerate(encabezados) if k})
+    return registros
+
+
+def _leer_hojas(nombres):
+    try:
+        archivo = conectar_archivo()
+        respuesta = archivo.values_batch_get(
+            [f"'{nombre}'" for nombre in nombres],
+            params={"valueRenderOption": "FORMATTED_VALUE"},
         )
+        rangos = respuesta.get("valueRanges", [])
+        if len(rangos) != len(nombres):
+            raise ErrorSheets("La respuesta de Google Sheets está incompleta. Vuelva a intentar.")
+        return tuple(_registros(rango.get("values", []), nombre) for rango, nombre in zip(rangos, nombres))
+    except ErrorSheets:
+        raise
+    except (OSError, ValueError, GoogleAuthError, RequestException, gspread.exceptions.GSpreadException) as exc:
+        raise ErrorSheets(_mensaje_error(exc)) from None
 
-    cliente = gspread.service_account(
-        filename=str(RUTA_CREDENCIALES)
-    )
 
-    archivo = cliente.open_by_key(SPREADSHEET_ID)
+def obtener_datos_dashboard():
+    return _leer_hojas([HOJA_SOLICITUDES, HOJA_FIRMAS])
 
-    return archivo
-
-
-# ---------------------------------------------------------
-# OBTENER SOLICITUDES
-# ---------------------------------------------------------
 
 def obtener_solicitudes():
-    """
-    Recupera todos los registros de la hoja SOLICITUDES.
-    """
+    return _leer_hojas([HOJA_SOLICITUDES])[0]
 
-    archivo = conectar_archivo()
-
-    hoja = archivo.worksheet(HOJA_SOLICITUDES)
-
-    solicitudes = hoja.get_all_records()
-
-    return solicitudes
-
-
-# ---------------------------------------------------------
-# OBTENER DATOS
-# ---------------------------------------------------------
 
 def obtener_datos():
-    """
-    Función utilizada por analisis.py.
-
-    Devuelve las solicitudes registradas en Google Sheets.
-    """
-
     return obtener_solicitudes()
 
 
-# ---------------------------------------------------------
-# OBTENER FIRMAS
-# ---------------------------------------------------------
-
 def obtener_firmas():
-    """
-    Recupera todos los registros de la hoja FIRMAS.
-    """
+    return _leer_hojas([HOJA_FIRMAS])[0]
 
-    archivo = conectar_archivo()
-
-    hoja = archivo.worksheet(HOJA_FIRMAS)
-
-    firmas = hoja.get_all_records()
-
-    return firmas
-
-
-# ---------------------------------------------------------
-# OBTENER DATOS PARA EL DASHBOARD
-# ---------------------------------------------------------
-
-def obtener_datos_dashboard():
-    """
-    Recupera la información necesaria para app.py.
-
-    Retorna dos listas:
-
-    1. solicitudes
-    2. firmas
-
-    Esto permite que app.py pueda hacer:
-
-    solicitudes, firmas = obtener_datos_dashboard()
-    """
-
-    archivo = conectar_archivo()
-
-    hoja_solicitudes = archivo.worksheet(HOJA_SOLICITUDES)
-    hoja_firmas = archivo.worksheet(HOJA_FIRMAS)
-
-    solicitudes = hoja_solicitudes.get_all_records()
-    firmas = hoja_firmas.get_all_records()
-
-    return solicitudes, firmas
-
-
-# ---------------------------------------------------------
-# MOSTRAR SOLICITUDES EN TERMINAL
-# ---------------------------------------------------------
 
 def mostrar_solicitudes(datos):
-    """
-    Muestra las solicitudes principales en formato de tabla.
-    """
+    columnas = ["Código", "Registro", "Estado", "Solicitante", "DNI / CE", "Monto", "Área", "Categoría", "Uso previsto"]
+    print(tabulate([[r.get(c, "") for c in columnas] for r in datos], headers=columnas, tablefmt="grid") if datos else "No hay solicitudes registradas.")
 
-    if not datos:
-        print("No hay solicitudes registradas.")
-        return
-
-    columnas = [
-        "Código",
-        "Registro",
-        "Estado",
-        "Solicitante",
-        "DNI / CE",
-        "Monto",
-        "Área",
-        "Categoría",
-        "Uso previsto",
-    ]
-
-    tabla = []
-
-    for solicitud in datos:
-
-        fila = [
-            solicitud.get(columna, "")
-            for columna in columnas
-        ]
-
-        tabla.append(fila)
-
-    print(
-        tabulate(
-            tabla,
-            headers=columnas,
-            tablefmt="grid",
-        )
-    )
-
-
-# ---------------------------------------------------------
-# MOSTRAR FIRMAS EN TERMINAL
-# ---------------------------------------------------------
 
 def mostrar_firmas(datos):
-    """
-    Muestra las firmas principales en formato de tabla.
-    """
+    columnas = ["ID Firma", "Código vale", "Registro", "Tipo", "Estado"]
+    print(tabulate([[r.get(c, "") for c in columnas] for r in datos], headers=columnas, tablefmt="grid") if datos else "No hay firmas registradas.")
 
-    if not datos:
-        print("No hay firmas registradas.")
-        return
-
-    columnas = [
-        "ID Firma",
-        "Código vale",
-        "Registro",
-        "Tipo",
-        "Estado",
-    ]
-
-    tabla = []
-
-    for firma in datos:
-
-        fila = [
-            firma.get(columna, "")
-            for columna in columnas
-        ]
-
-        tabla.append(fila)
-
-    print(
-        tabulate(
-            tabla,
-            headers=columnas,
-            tablefmt="grid",
-        )
-    )
-
-
-# ---------------------------------------------------------
-# PRUEBA DIRECTA DEL ARCHIVO
-# ---------------------------------------------------------
 
 if __name__ == "__main__":
-
     try:
-
         solicitudes, firmas = obtener_datos_dashboard()
-
-        print("\n========================================")
-        print("VALPRO - PRUEBA DE CONEXIÓN")
-        print("========================================")
-
-        print("\nConexión correcta.")
-
-        print(
-            f"Solicitudes encontradas: {len(solicitudes)}"
-        )
-
-        print(
-            f"Firmas encontradas: {len(firmas)}"
-        )
-
-        print("\nSOLICITUDES")
+        print(f"Conexión correcta: {len(solicitudes)} solicitudes; {len(firmas)} firmas.")
         mostrar_solicitudes(solicitudes)
-
-        print("\nFIRMAS")
         mostrar_firmas(firmas)
-
-    except Exception as error:
-
-        print("\n========================================")
-        print("ERROR DE CONEXIÓN")
-        print("========================================")
-
-        print(error)
+    except ErrorSheets as exc:
+        print(exc)
+        raise SystemExit(1)

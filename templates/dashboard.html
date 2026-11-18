@@ -10,6 +10,7 @@
     >
 
     <title>Dashboard - Vale Provisional</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
 
     <link
         rel="stylesheet"
@@ -18,10 +19,10 @@
 
     <link
         rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+        href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css') }}"
     >
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
 
     <style>
         /* FASE 2B - acciones y modales compactos, sin alterar el layout principal */
@@ -358,14 +359,14 @@
 
                     <span class="estado correcto">
                         <i class="bi bi-cloud-check"></i>
-                        Google Sheets conectado
+                        {{ 'Demostración — datos ficticios' if modo_demo else 'Google Sheets conectado' }}
                     </span>
 
                     {% else %}
 
                     <span class="estado error">
                         <i class="bi bi-cloud-slash"></i>
-                        Error de conexión
+                        Datos no disponibles
                     </span>
 
                     {% endif %}
@@ -374,7 +375,7 @@
                     <small>
                         <i class="bi bi-clock"></i>
 
-                        Última actualización:
+                        {{ 'Último intento:' if error else 'Última actualización:' }}
                         {{ ultima_actualizacion }}
                     </small>
 
@@ -401,13 +402,13 @@
 
         {% if error %}
 
-        <section class="mensaje-error">
+        <section class="mensaje-error" role="alert">
 
             <i class="bi bi-exclamation-triangle"></i>
 
             <div>
                 <strong>
-                    Error de conexión
+                    Datos no disponibles
                 </strong>
 
                 <p>
@@ -421,6 +422,11 @@
 
 
 
+        {% if modo_demo %}
+        <section class="aviso-datos" role="status"><strong>DEMOSTRACIÓN: DATOS FICTICIOS</strong>. No se consulta Google Sheets ni se muestran datos administrativos reales.</section>
+        {% endif %}
+        {% if avisos %}<section class="aviso-datos" role="status"><strong>Revisión de datos</strong><ul>{% for aviso in avisos %}<li>{{ aviso }}</li>{% endfor %}</ul></section>{% endif %}
+        {% if conexion_correcta %}
         <!-- =====================================================
              INDICADORES
         ====================================================== -->
@@ -570,10 +576,7 @@
                         </span>
 
                         <strong>
-                            S/
-                            {{ "{:,.2f}".format(
-                                indicadores.monto_total
-                            ) }}
+                            {{ ('S/ {:,.2f}'.format(indicadores.monto_total)) if indicadores.monto_total is not none else 'No disponible' }}
                         </strong>
 
                     </div>
@@ -595,10 +598,7 @@
                         </span>
 
                         <strong>
-                            S/
-                            {{ "{:,.2f}".format(
-                                indicadores.monto_promedio
-                            ) }}
+                            {{ ('S/ {:,.2f}'.format(indicadores.monto_promedio)) if indicadores.monto_promedio is not none else 'No disponible' }}
                         </strong>
 
                     </div>
@@ -728,6 +728,7 @@
 
         <div
             id="datos-dashboard"
+            data-montos-disponibles='{{ montos_disponibles | tojson }}'
 
             data-estados-labels='{{ estados_labels | tojson }}'
             data-estados-valores='{{ estados_valores | tojson }}'
@@ -812,9 +813,7 @@
 
                         <div>
 
-                            <h3>
-                                Distribución de estados
-                            </h3>
+                            <h3 id="tituloDistribucion">Solicitudes por categoría</h3>
 
                             <p>
                                 Participación porcentual
@@ -826,6 +825,8 @@
                     </div>
 
 
+                    <label for="tipoDistribucion">Agrupar por</label>
+                    <select id="tipoDistribucion"><option value="categorias">Categoría</option><option value="estados">Estado</option></select>
                     <div class="canvas-contenedor">
                         <canvas id="graficoDistribucion"></canvas>
                     </div>
@@ -942,7 +943,7 @@
 
                     <input
                         type="search"
-                        id="buscador"
+                        id="buscador" aria-label="Buscar solicitudes"
                         placeholder="Buscar código, solicitante, área o categoría..."
                     >
 
@@ -950,7 +951,7 @@
 
 
 
-                <select id="filtroEstado">
+                <select id="filtroEstado" aria-label="Filtrar por estado">
 
                     <option value="">
                         Todos los estados
@@ -968,7 +969,7 @@
 
 
 
-                <select id="filtroArea">
+                <select id="filtroArea" aria-label="Filtrar por área">
 
                     <option value="">
                         Todas las áreas
@@ -986,7 +987,7 @@
 
 
 
-                <select id="filtroCategoria">
+                <select id="filtroCategoria" aria-label="Filtrar por categoría">
 
                     <option value="">
                         Todas las categorías
@@ -1231,11 +1232,13 @@
                     </tbody>
 
                 </table>
+                <p id="sinResultados" role="status" hidden>No hay solicitudes que coincidan con los filtros.</p>
 
             </div>
 
         </section>
 
+        {% endif %}
     </main>
 
 
@@ -1359,7 +1362,7 @@
                 </div>
 
                 <div class="vp2-visor">
-                    <iframe id="vp2FirmaFrame" title="Vista previa de firma" loading="lazy"></iframe>
+                    <iframe sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer" id="vp2FirmaFrame" title="Vista previa de firma" loading="lazy"></iframe>
                 </div>
 
                 <a id="vp2FirmaLink" class="vp2-link" href="#" target="_blank" rel="noopener noreferrer">
@@ -1374,1240 +1377,7 @@
          JAVASCRIPT
     ========================================================== -->
 
-    <script>
-
-        /* =====================================================
-           TEMA CLARO / OSCURO
-        ====================================================== */
-
-        const botonTema =
-            document.getElementById(
-                "botonTema"
-            );
-
-
-        function aplicarTemaGuardado() {
-
-            const temaGuardado =
-                localStorage.getItem(
-                    "temaDashboard"
-                );
-
-
-            if (
-                temaGuardado === "oscuro"
-            ) {
-
-                document.body.classList.add(
-                    "modo-oscuro"
-                );
-
-            }
-
-        }
-
-
-        function actualizarIconoTema() {
-
-            const oscuro =
-                document.body.classList.contains(
-                    "modo-oscuro"
-                );
-
-
-            botonTema.innerHTML =
-                oscuro
-
-                    ? '<i class="bi bi-sun-fill"></i>'
-
-                    : '<i class="bi bi-moon-stars-fill"></i>';
-
-
-            botonTema.title =
-                oscuro
-
-                    ? "Cambiar a modo claro"
-
-                    : "Cambiar a modo oscuro";
-
-        }
-
-
-        aplicarTemaGuardado();
-
-        actualizarIconoTema();
-
-
-
-        botonTema.addEventListener(
-
-            "click",
-
-            function() {
-
-                document.body.classList.toggle(
-                    "modo-oscuro"
-                );
-
-
-                const oscuro =
-                    document.body.classList.contains(
-                        "modo-oscuro"
-                    );
-
-
-                localStorage.setItem(
-
-                    "temaDashboard",
-
-                    oscuro
-                        ? "oscuro"
-                        : "claro"
-
-                );
-
-
-                actualizarIconoTema();
-
-                actualizarColoresGraficos();
-
-            }
-
-        );
-
-
-
-        /* =====================================================
-           DATOS
-        ====================================================== */
-
-        const datosDashboard =
-            document.getElementById(
-                "datos-dashboard"
-            );
-
-
-        const estadosLabels = JSON.parse(
-            datosDashboard.dataset.estadosLabels
-        );
-
-
-        const estadosValores = JSON.parse(
-            datosDashboard.dataset.estadosValores
-        );
-
-
-        const areasLabels = JSON.parse(
-            datosDashboard.dataset.areasLabels
-        );
-
-
-        const areasValores = JSON.parse(
-            datosDashboard.dataset.areasValores
-        );
-
-
-        const montosLabels = JSON.parse(
-            datosDashboard.dataset.montosLabels
-        );
-
-
-        const montosValores = JSON.parse(
-            datosDashboard.dataset.montosValores
-        );
-
-
-
-        /* =====================================================
-           COLORES DE ESTADO
-        ====================================================== */
-
-        const COLORES_ESTADO = {
-
-            "PENDIENTE FIRMA":
-                "#d97706",
-
-            "PENDIENTE JEFE":
-                "#0ea5e9",
-
-            "PENDIENTE ADMIN":
-                "#7c3aed",
-
-            "APROBADO":
-                "#16a34a",
-
-            "RECHAZADO":
-                "#dc2626",
-
-            "CERRADO":
-                "#475569",
-
-            "DESEMBOLSADO":
-                "#2563eb",
-
-            "EN RENDICIÓN":
-                "#ca8a04"
-
-        };
-
-
-        function obtenerColorEstado(
-            estado
-        ) {
-
-            return (
-                COLORES_ESTADO[estado]
-                ||
-                "#2563eb"
-            );
-
-        }
-
-
-        const coloresEstados =
-            estadosLabels.map(
-                obtenerColorEstado
-            );
-
-
-
-        const coloresAreas = [
-
-            "#2563eb",
-            "#0ea5e9",
-            "#7c3aed",
-            "#16a34a",
-            "#d97706",
-            "#dc2626",
-            "#0891b2",
-            "#475569"
-
-        ];
-
-
-
-        const coloresMontos = [
-
-            "#7c3aed",
-            "#2563eb",
-            "#0ea5e9",
-            "#16a34a",
-            "#d97706",
-            "#dc2626"
-
-        ];
-
-
-
-        /* =====================================================
-           COLORES DINÁMICOS PARA GRÁFICOS
-        ====================================================== */
-
-        function colorTextoGrafico() {
-
-            return document.body.classList.contains(
-                "modo-oscuro"
-            )
-                ? "#cbd5e1"
-                : "#64748b";
-
-        }
-
-
-        function colorGridGrafico() {
-
-            return document.body.classList.contains(
-                "modo-oscuro"
-            )
-                ? "#263244"
-                : "#eef2f7";
-
-        }
-
-
-        function colorBordeDona() {
-
-            return document.body.classList.contains(
-                "modo-oscuro"
-            )
-                ? "#111827"
-                : "#ffffff";
-
-        }
-
-
-
-        Chart.defaults.font.family =
-            "'Segoe UI', Arial, sans-serif";
-
-
-        Chart.defaults.color =
-            colorTextoGrafico();
-
-
-
-        /* =====================================================
-           GRÁFICO ESTADOS
-        ====================================================== */
-
-        const graficoEstados = new Chart(
-
-            document.getElementById(
-                "graficoEstados"
-            ),
-
-            {
-
-                type: "bar",
-
-                data: {
-
-                    labels:
-                        estadosLabels,
-
-                    datasets: [
-
-                        {
-
-                            label:
-                                "Solicitudes",
-
-                            data:
-                                estadosValores,
-
-                            backgroundColor:
-                                coloresEstados,
-
-                            borderRadius:
-                                8,
-
-                            borderSkipped:
-                                false,
-
-                            maxBarThickness:
-                                58
-
-                        }
-
-                    ]
-
-                },
-
-
-                options: {
-
-                    responsive:
-                        true,
-
-                    maintainAspectRatio:
-                        false,
-
-                    animation: {
-                        duration: 850,
-                        easing: "easeOutQuart"
-                    },
-
-
-                    plugins: {
-
-                        legend: {
-                            display: false
-                        },
-
-                        tooltip: {
-
-                            backgroundColor:
-                                "#172033",
-
-                            padding:
-                                12,
-
-                            cornerRadius:
-                                8
-
-                        }
-
-                    },
-
-
-                    scales: {
-
-                        x: {
-
-                            ticks: {
-                                color:
-                                    colorTextoGrafico()
-                            },
-
-                            grid: {
-                                display: false
-                            },
-
-                            border: {
-                                display: false
-                            }
-
-                        },
-
-                        y: {
-
-                            beginAtZero:
-                                true,
-
-                            ticks: {
-                                precision: 0,
-                                color:
-                                    colorTextoGrafico()
-                            },
-
-                            border: {
-                                display: false
-                            },
-
-                            grid: {
-                                color:
-                                    colorGridGrafico()
-                            }
-
-                        }
-
-                    }
-
-                }
-
-            }
-
-        );
-
-
-
-        /* =====================================================
-           DISTRIBUCIÓN
-        ====================================================== */
-
-        const graficoDistribucion =
-            new Chart(
-
-                document.getElementById(
-                    "graficoDistribucion"
-                ),
-
-                {
-
-                    type:
-                        "doughnut",
-
-                    data: {
-
-                        labels:
-                            estadosLabels,
-
-                        datasets: [
-
-                            {
-
-                                data:
-                                    estadosValores,
-
-                                backgroundColor:
-                                    coloresEstados,
-
-                                borderColor:
-                                    colorBordeDona(),
-
-                                borderWidth:
-                                    4,
-
-                                hoverOffset:
-                                    8
-
-                            }
-
-                        ]
-
-                    },
-
-
-                    options: {
-
-                        responsive:
-                            true,
-
-                        maintainAspectRatio:
-                            false,
-
-                        cutout:
-                            "64%",
-
-                        animation: {
-                            duration: 900
-                        },
-
-
-                        plugins: {
-
-                            legend: {
-
-                                position:
-                                    "bottom",
-
-                                labels: {
-
-                                    usePointStyle:
-                                        true,
-
-                                    padding:
-                                        18,
-
-                                    color:
-                                        colorTextoGrafico()
-
-                                }
-
-                            },
-
-                            tooltip: {
-
-                                backgroundColor:
-                                    "#172033",
-
-                                padding:
-                                    12
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-            );
-
-
-
-        /* =====================================================
-           ÁREAS
-        ====================================================== */
-
-        const graficoAreas =
-            new Chart(
-
-                document.getElementById(
-                    "graficoAreas"
-                ),
-
-                {
-
-                    type:
-                        "bar",
-
-                    data: {
-
-                        labels:
-                            areasLabels,
-
-                        datasets: [
-
-                            {
-
-                                label:
-                                    "Solicitudes",
-
-                                data:
-                                    areasValores,
-
-                                backgroundColor:
-                                    areasLabels.map(
-
-                                        function(
-                                            _,
-                                            index
-                                        ) {
-
-                                            return coloresAreas[
-                                                index
-                                                %
-                                                coloresAreas.length
-                                            ];
-
-                                        }
-
-                                    ),
-
-                                borderRadius:
-                                    8,
-
-                                borderSkipped:
-                                    false,
-
-                                maxBarThickness:
-                                    58
-
-                            }
-
-                        ]
-
-                    },
-
-
-                    options: {
-
-                        responsive:
-                            true,
-
-                        maintainAspectRatio:
-                            false,
-
-                        animation: {
-                            duration: 850
-                        },
-
-                        plugins: {
-
-                            legend: {
-                                display: false
-                            }
-
-                        },
-
-                        scales: {
-
-                            x: {
-
-                                ticks: {
-                                    color:
-                                        colorTextoGrafico()
-                                },
-
-                                grid: {
-                                    display: false
-                                },
-
-                                border: {
-                                    display: false
-                                }
-
-                            },
-
-                            y: {
-
-                                beginAtZero:
-                                    true,
-
-                                ticks: {
-                                    precision: 0,
-                                    color:
-                                        colorTextoGrafico()
-                                },
-
-                                border: {
-                                    display: false
-                                },
-
-                                grid: {
-                                    color:
-                                        colorGridGrafico()
-                                }
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-            );
-
-
-
-        /* =====================================================
-           MONTOS
-        ====================================================== */
-
-        const graficoMontos =
-            new Chart(
-
-                document.getElementById(
-                    "graficoMontos"
-                ),
-
-                {
-
-                    type:
-                        "bar",
-
-                    data: {
-
-                        labels:
-                            montosLabels,
-
-                        datasets: [
-
-                            {
-
-                                label:
-                                    "Monto solicitado",
-
-                                data:
-                                    montosValores,
-
-                                backgroundColor:
-                                    montosLabels.map(
-
-                                        function(
-                                            _,
-                                            index
-                                        ) {
-
-                                            return coloresMontos[
-                                                index
-                                                %
-                                                coloresMontos.length
-                                            ];
-
-                                        }
-
-                                    ),
-
-                                borderRadius:
-                                    8,
-
-                                borderSkipped:
-                                    false,
-
-                                maxBarThickness:
-                                    58
-
-                            }
-
-                        ]
-
-                    },
-
-
-                    options: {
-
-                        responsive:
-                            true,
-
-                        maintainAspectRatio:
-                            false,
-
-                        animation: {
-                            duration: 850
-                        },
-
-
-                        plugins: {
-
-                            legend: {
-                                display: false
-                            },
-
-
-                            tooltip: {
-
-                                backgroundColor:
-                                    "#172033",
-
-                                padding:
-                                    12,
-
-                                callbacks: {
-
-                                    label:
-                                        function(
-                                            context
-                                        ) {
-
-                                            return (
-                                                "S/ "
-                                                +
-                                                Number(
-                                                    context.raw
-                                                ).toLocaleString(
-                                                    "es-PE",
-                                                    {
-                                                        minimumFractionDigits:
-                                                            2
-                                                    }
-                                                )
-                                            );
-
-                                        }
-
-                                }
-
-                            }
-
-                        },
-
-
-                        scales: {
-
-                            x: {
-
-                                ticks: {
-                                    color:
-                                        colorTextoGrafico()
-                                },
-
-                                grid: {
-                                    display: false
-                                },
-
-                                border: {
-                                    display: false
-                                }
-
-                            },
-
-
-                            y: {
-
-                                beginAtZero:
-                                    true,
-
-                                ticks: {
-
-                                    color:
-                                        colorTextoGrafico(),
-
-                                    callback:
-                                        function(
-                                            value
-                                        ) {
-
-                                            return (
-                                                "S/ "
-                                                +
-                                                value
-                                            );
-
-                                        }
-
-                                },
-
-                                border: {
-                                    display: false
-                                },
-
-                                grid: {
-                                    color:
-                                        colorGridGrafico()
-                                }
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-            );
-
-
-
-        /* =====================================================
-           ACTUALIZAR GRÁFICOS AL CAMBIAR TEMA
-        ====================================================== */
-
-        function actualizarColoresGraficos() {
-
-            Chart.defaults.color =
-                colorTextoGrafico();
-
-
-            graficoEstados.options.scales.x.ticks.color =
-                colorTextoGrafico();
-
-            graficoEstados.options.scales.y.ticks.color =
-                colorTextoGrafico();
-
-            graficoEstados.options.scales.y.grid.color =
-                colorGridGrafico();
-
-
-            graficoDistribucion.options.plugins.legend.labels.color =
-                colorTextoGrafico();
-
-            graficoDistribucion.data.datasets[0].borderColor =
-                colorBordeDona();
-
-
-            graficoAreas.options.scales.x.ticks.color =
-                colorTextoGrafico();
-
-            graficoAreas.options.scales.y.ticks.color =
-                colorTextoGrafico();
-
-            graficoAreas.options.scales.y.grid.color =
-                colorGridGrafico();
-
-
-            graficoMontos.options.scales.x.ticks.color =
-                colorTextoGrafico();
-
-            graficoMontos.options.scales.y.ticks.color =
-                colorTextoGrafico();
-
-            graficoMontos.options.scales.y.grid.color =
-                colorGridGrafico();
-
-
-            graficoEstados.update();
-
-            graficoDistribucion.update();
-
-            graficoAreas.update();
-
-            graficoMontos.update();
-
-        }
-
-
-
-        /* =====================================================
-           FILTROS
-        ====================================================== */
-
-        const buscador =
-            document.getElementById(
-                "buscador"
-            );
-
-
-        const filtroEstado =
-            document.getElementById(
-                "filtroEstado"
-            );
-
-
-        const filtroArea =
-            document.getElementById(
-                "filtroArea"
-            );
-
-
-        const filtroCategoria =
-            document.getElementById(
-                "filtroCategoria"
-            );
-
-
-        const botonLimpiar =
-            document.getElementById(
-                "botonLimpiar"
-            );
-
-
-        const filas =
-            document.querySelectorAll(
-                "#tablaSolicitudes tbody tr"
-            );
-
-
-        const contadorResultados =
-            document.getElementById(
-                "contador-resultados"
-            );
-
-
-
-        function aplicarFiltros() {
-
-            const texto =
-                buscador.value
-                    .toLowerCase()
-                    .trim();
-
-
-            const estadoSeleccionado =
-                filtroEstado.value
-                    .toLowerCase();
-
-
-            const areaSeleccionada =
-                filtroArea.value
-                    .toLowerCase();
-
-
-            const categoriaSeleccionada =
-                filtroCategoria.value
-                    .toLowerCase();
-
-
-            let visibles = 0;
-
-
-
-            filas.forEach(
-
-                function(fila) {
-
-                    const codigo =
-                        fila.dataset.codigo;
-
-
-                    const solicitante =
-                        fila.dataset.solicitante;
-
-
-                    const area =
-                        fila.dataset.area;
-
-
-                    const categoria =
-                        fila.dataset.categoria;
-
-
-                    const estado =
-                        fila.dataset.estado;
-
-
-
-                    const coincideTexto =
-
-                        codigo.includes(texto)
-
-                        ||
-
-                        solicitante.includes(texto)
-
-                        ||
-
-                        area.includes(texto)
-
-                        ||
-
-                        categoria.includes(texto);
-
-
-
-                    const coincideEstado =
-
-                        estadoSeleccionado === ""
-
-                        ||
-
-                        estado ===
-                        estadoSeleccionado;
-
-
-
-                    const coincideArea =
-
-                        areaSeleccionada === ""
-
-                        ||
-
-                        area ===
-                        areaSeleccionada;
-
-
-
-                    const coincideCategoria =
-
-                        categoriaSeleccionada === ""
-
-                        ||
-
-                        categoria ===
-                        categoriaSeleccionada;
-
-
-
-                    const mostrar =
-
-                        coincideTexto
-
-                        &&
-
-                        coincideEstado
-
-                        &&
-
-                        coincideArea
-
-                        &&
-
-                        coincideCategoria;
-
-
-
-                    fila.style.display =
-                        mostrar
-                            ? ""
-                            : "none";
-
-
-                    if (mostrar) {
-                        visibles++;
-                    }
-
-                }
-
-            );
-
-
-            contadorResultados.textContent =
-                visibles
-                +
-                " resultado(s)";
-
-        }
-
-
-
-        buscador.addEventListener(
-            "input",
-            aplicarFiltros
-        );
-
-
-        filtroEstado.addEventListener(
-            "change",
-            aplicarFiltros
-        );
-
-
-        filtroArea.addEventListener(
-            "change",
-            aplicarFiltros
-        );
-
-
-        filtroCategoria.addEventListener(
-            "change",
-            aplicarFiltros
-        );
-
-
-
-        botonLimpiar.addEventListener(
-
-            "click",
-
-            function() {
-
-                buscador.value =
-                    "";
-
-                filtroEstado.value =
-                    "";
-
-                filtroArea.value =
-                    "";
-
-                filtroCategoria.value =
-                    "";
-
-                aplicarFiltros();
-
-            }
-
-        );
-
-
-        aplicarFiltros();
-
-        /* =====================================================
-           FASE 2B - DETALLE Y FIRMA
-        ====================================================== */
-        const vp2ModalDetalle = document.getElementById("vp2ModalDetalle");
-        const vp2ModalFirma = document.getElementById("vp2ModalFirma");
-        const vp2FirmaFrame = document.getElementById("vp2FirmaFrame");
-        const vp2FirmaLink = document.getElementById("vp2FirmaLink");
-
-        function vp2Texto(id, valor) {
-            const el = document.getElementById(id);
-            if (el) el.textContent = String(valor || "").trim() || "-";
-        }
-
-        function vp2Abrir(modal) {
-            modal.classList.add("vp2-activo");
-            document.body.classList.add("vp2-modal-open");
-        }
-
-        function vp2Cerrar(modal) {
-            modal.classList.remove("vp2-activo");
-            if (!document.querySelector(".vp2-modal.vp2-activo")) {
-                document.body.classList.remove("vp2-modal-open");
-            }
-            if (modal === vp2ModalFirma) {
-                vp2FirmaFrame.removeAttribute("src");
-            }
-        }
-
-        function vp2PreviewDrive(url) {
-            const limpio = String(url || "").trim();
-            if (!limpio) return "";
-            const match = limpio.match(/\/file\/d\/([^/]+)/);
-            if (match) return "https://drive.google.com/file/d/" + match[1] + "/preview";
-            return limpio;
-        }
-
-        document.querySelectorAll(".js-vp2-detalle").forEach(function(boton) {
-            boton.addEventListener("click", function() {
-                const d = boton.dataset;
-                vp2Texto("vp2dCodigo", d.codigo);
-                vp2Texto("vp2dEstado", d.estado);
-                vp2Texto("vp2dSolicitante", d.solicitante);
-                vp2Texto("vp2dNombre", ((d.nombres || "") + " " + (d.apellidos || "")).trim());
-                vp2Texto("vp2dDocumento", d.documento);
-                vp2Texto("vp2dCorreo", d.correo);
-                vp2Texto("vp2dCargo", d.cargo);
-                vp2Texto("vp2dArea", d.area);
-                vp2Texto("vp2dCentro", d.centroCosto);
-                vp2Texto("vp2dCategoria", d.categoria);
-                vp2Texto("vp2dMonto", d.monto);
-                vp2Texto("vp2dUso", d.uso);
-                vp2Texto("vp2dRegistro", d.registro);
-                vp2Texto("vp2dFirma", d.firmaEstado);
-                vp2Texto("vp2dMotivo", d.motivo);
-                vp2Abrir(vp2ModalDetalle);
-            });
-        });
-
-        document.querySelectorAll(".js-vp2-firma").forEach(function(boton) {
-            boton.addEventListener("click", function() {
-                const d = boton.dataset;
-                const original = String(d.firmaUrl || "").trim();
-                vp2Texto("vp2fCodigo", d.codigo);
-                vp2Texto("vp2fSolicitante", d.solicitante);
-                vp2Texto("vp2fTipo", d.firmaTipo);
-                vp2Texto("vp2fEstado", d.firmaEstado);
-                vp2Texto("vp2fRegistro", d.firmaRegistro);
-                const preview = vp2PreviewDrive(original);
-                if (preview) vp2FirmaFrame.src = preview;
-                vp2FirmaLink.href = original || "#";
-                vp2FirmaLink.style.display = original ? "inline-flex" : "none";
-                vp2Abrir(vp2ModalFirma);
-            });
-        });
-
-        document.querySelectorAll(".js-vp2-cerrar").forEach(function(boton) {
-            boton.addEventListener("click", function() {
-                vp2Cerrar(boton.closest(".vp2-modal"));
-            });
-        });
-
-        [vp2ModalDetalle, vp2ModalFirma].forEach(function(modal) {
-            modal.addEventListener("click", function(e) {
-                if (e.target === modal) vp2Cerrar(modal);
-            });
-        });
-
-        document.addEventListener("keydown", function(e) {
-            if (e.key !== "Escape") return;
-            if (vp2ModalFirma.classList.contains("vp2-activo")) vp2Cerrar(vp2ModalFirma);
-            else if (vp2ModalDetalle.classList.contains("vp2-activo")) vp2Cerrar(vp2ModalDetalle);
-        });
-
-    </script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}" defer></script>
 
 </body>
 
