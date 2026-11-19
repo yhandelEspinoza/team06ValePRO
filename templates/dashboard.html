@@ -22,7 +22,7 @@
         href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css') }}"
     >
 
-    <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/plotly.min.js') }}"></script>
 
     <style>
         /* FASE 2B - acciones y modales compactos, sin alterar el layout principal */
@@ -726,24 +726,8 @@
              DATOS PARA GRÁFICOS
         ====================================================== -->
 
-        <div
-            id="datos-dashboard"
-            data-montos-disponibles='{{ montos_disponibles | tojson }}'
-
-            data-estados-labels='{{ estados_labels | tojson }}'
-            data-estados-valores='{{ estados_valores | tojson }}'
-
-            data-areas-labels='{{ areas_labels | tojson }}'
-            data-areas-valores='{{ areas_valores | tojson }}'
-
-            data-categorias-labels='{{ categorias_labels | tojson }}'
-            data-categorias-valores='{{ categorias_valores | tojson }}'
-
-            data-montos-labels='{{ montos_categoria_labels | tojson }}'
-            data-montos-valores='{{ montos_categoria_valores | tojson }}'
-        ></div>
-
-
+        <script type="application/json" id="plotly-data">{{ figuras | tojson }}</script>
+        <div id="datos-dashboard" data-montos-disponibles='{{ montos_disponibles | tojson }}'></div>
 
         <!-- =====================================================
              GRÁFICOS
@@ -796,7 +780,7 @@
 
 
                     <div class="canvas-contenedor">
-                        <canvas id="graficoEstados"></canvas>
+                        <div id="graficoEstados" class="grafico-plotly"></div>
                     </div>
 
                 </article>
@@ -815,9 +799,8 @@
 
                             <h3 id="tituloDistribucion">Solicitudes por categoría</h3>
 
-                            <p>
-                                Participación porcentual
-                                de cada estado.
+                            <p id="descripcionDistribucion">
+                                Participación porcentual por categoría.
                             </p>
 
                         </div>
@@ -828,7 +811,7 @@
                     <label for="tipoDistribucion">Agrupar por</label>
                     <select id="tipoDistribucion"><option value="categorias">Categoría</option><option value="estados">Estado</option></select>
                     <div class="canvas-contenedor">
-                        <canvas id="graficoDistribucion"></canvas>
+                        <div id="graficoDistribucion" class="grafico-plotly"></div>
                     </div>
 
                 </article>
@@ -860,7 +843,7 @@
 
 
                     <div class="canvas-contenedor">
-                        <canvas id="graficoAreas"></canvas>
+                        <div id="graficoAreas" class="grafico-plotly"></div>
                     </div>
 
                 </article>
@@ -892,7 +875,7 @@
 
 
                     <div class="canvas-contenedor">
-                        <canvas id="graficoMontos"></canvas>
+                        <div id="graficoMontos" class="grafico-plotly"></div>
                     </div>
 
                 </article>

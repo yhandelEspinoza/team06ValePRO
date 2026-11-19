@@ -113,72 +113,64 @@
 
         const datosDashboard = document.getElementById('datos-dashboard');
         if (!datosDashboard) return;
-        const leer = clave => JSON.parse(datosDashboard.dataset[clave]);
-        const colores = ['#2563eb', '#0ea5e9', '#7c3aed', '#16a34a', '#d97706', '#dc2626', '#0891b2'];
-        const coloresEstado = {'PENDIENTE FIRMA':'#d97706','PENDIENTE JEFE':'#0ea5e9','APROBADO':'#16a34a','RECHAZADO':'#dc2626'};
+        const fuentePlotly = document.getElementById('plotly-data');
+        const figuras = fuentePlotly ? JSON.parse(fuentePlotly.textContent) : {};
+        const configuracionPlotly = {responsive: true, displaylogo: false, modeBarButtonsToRemove: ['toImage', 'sendDataToCloud']};
         const colorTexto = () => document.body.classList.contains('modo-oscuro') ? '#cbd5e1' : '#64748b';
-        function crearGrafico(id, labels, valores, circular=false, dinero=false) {
-            const canvas = document.getElementById(id);
-            if (!canvas) return null;
-            const mensaje = document.createElement('p');
-            mensaje.className = 'grafico-mensaje';
-            canvas.parentElement.appendChild(mensaje);
-            if (!labels.length) {
-                canvas.hidden = true;
+        const colorCuadricula = () => document.body.classList.contains('modo-oscuro') ? '#334155' : '#eef2f7';
+        function temaFigura(figura) {
+            return {
+                ...figura.layout,
+                font: {...figura.layout.font, color: colorTexto()},
+                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+                xaxis: {...figura.layout.xaxis, tickfont: {color: colorTexto()}},
+                yaxis: {...figura.layout.yaxis, tickfont: {color: colorTexto()}, gridcolor: colorCuadricula()}
+            };
+        }
+        function mostrarGrafico(id, figura, dinero=false) {
+            const contenedor = document.getElementById(id);
+            if (!contenedor) return;
+            let mensaje = contenedor.parentElement.querySelector('.grafico-mensaje');
+            if (!mensaje) {
+                mensaje = document.createElement('p');
+                mensaje.className = 'grafico-mensaje';
+                contenedor.parentElement.appendChild(mensaje);
+            }
+            if (!figura || !figura.data || !figura.data.length) {
+                contenedor.hidden = true;
                 mensaje.textContent = dinero && datosDashboard.dataset.montosDisponibles !== 'true'
                     ? 'Montos no disponibles: revise los avisos.' : 'Sin datos para este gráfico.';
-                return null;
+                return;
             }
-            if (typeof Chart === 'undefined') {
-                canvas.hidden = true;
+            if (typeof Plotly === 'undefined') {
+                contenedor.hidden = true;
                 mensaje.textContent = 'No se pudo cargar la biblioteca de gráficos. Los indicadores y filtros siguen disponibles.';
-                return null;
+                return;
             }
-            try {
-                const grafico = new Chart(canvas, {
-                    type: circular ? 'doughnut' : 'bar',
-                    data: {labels, datasets: [{label: dinero ? 'Monto solicitado' : 'Solicitudes', data: valores,
-                        backgroundColor: labels.map((l,i) => id === 'graficoEstados' ? (coloresEstado[l] || colores[i % colores.length]) : colores[i % colores.length]),
-                        borderRadius: circular ? 0 : 8, borderWidth: circular ? 3 : 0, maxBarThickness:58}]},
-                    options: {responsive:true, maintainAspectRatio:false, animation:{duration:250},
-                        plugins:{legend:{display:circular,position:'bottom',labels:{color:colorTexto()}},
-                            tooltip:{callbacks:{label:ctx => dinero ? 'S/ ' + Number(ctx.raw).toLocaleString('es-PE',{minimumFractionDigits:2}) : ctx.dataset.label + ': ' + ctx.raw}}},
-                        ...(circular ? {cutout:'64%'} : {scales:{x:{ticks:{color:colorTexto()},grid:{display:false}},y:{beginAtZero:true,ticks:{color:colorTexto(),...(dinero ? {callback:v=>'S/ '+v} : {precision:0})}}}})
-                    }
-                });
-                graficos.push(grafico);
-                return grafico;
-            } catch (_) {
-                canvas.hidden = true;
-                mensaje.textContent = 'No se pudo dibujar este gráfico.';
-                return null;
-            }
+            contenedor.hidden = false;
+            mensaje.textContent = '';
+            Plotly.react(contenedor, figura.data, temaFigura(figura), configuracionPlotly)
+                .catch(() => { contenedor.hidden = true; mensaje.textContent = 'No se pudo dibujar este gráfico.'; });
+            if (!graficos.includes(id)) graficos.push(id);
         }
-        crearGrafico('graficoEstados', leer('estadosLabels'), leer('estadosValores'));
-        const distribucion = crearGrafico('graficoDistribucion', leer('categoriasLabels'), leer('categoriasValores'), true);
-        crearGrafico('graficoAreas', leer('areasLabels'), leer('areasValores'));
-        crearGrafico('graficoMontos', leer('montosLabels'), leer('montosValores'), false, true);
+        mostrarGrafico('graficoEstados', figuras.estados);
+        mostrarGrafico('graficoDistribucion', figuras.categorias);
+        mostrarGrafico('graficoAreas', figuras.areas);
+        mostrarGrafico('graficoMontos', figuras.montos, true);
         document.getElementById('tipoDistribucion').addEventListener('change', e => {
             const estado = e.target.value === 'estados';
             document.getElementById('tituloDistribucion').textContent = estado ? 'Distribución de estados' : 'Solicitudes por categoría';
-            if (distribucion) {
-                distribucion.data.labels = leer(estado ? 'estadosLabels' : 'categoriasLabels');
-                distribucion.data.datasets[0].data = leer(estado ? 'estadosValores' : 'categoriasValores');
-                distribucion.data.datasets[0].backgroundColor = distribucion.data.labels.map((_,i)=>colores[i%colores.length]);
-                distribucion.update();
-            }
+            document.getElementById('descripcionDistribucion').textContent = estado ? 'Participación porcentual por estado.' : 'Participación porcentual por categoría.';
+            mostrarGrafico('graficoDistribucion', estado ? figuras.distribucion_estados : figuras.categorias);
         });
         function actualizarColoresGraficos() {
-            graficos.forEach(g => {
-                g.options.plugins.legend.labels.color = colorTexto();
-                if (g.options.scales.x) {
-                    g.options.scales.x.ticks.color = colorTexto();
-                    g.options.scales.y.ticks.color = colorTexto();
-                }
-                g.update();
+            graficos.forEach(id => {
+                const figura = id === 'graficoDistribucion'
+                    ? (document.getElementById('tipoDistribucion').value === 'estados' ? figuras.distribucion_estados : figuras.categorias)
+                    : figuras[id === 'graficoEstados' ? 'estados' : id === 'graficoAreas' ? 'areas' : 'montos'];
+                if (figura && figura.data.length) Plotly.relayout(id, temaFigura(figura));
             });
-        }
-        const buscador =
+        }        const buscador =
             document.getElementById(
                 "buscador"
             );

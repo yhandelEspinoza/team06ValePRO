@@ -1,7 +1,4 @@
 import pytest
-import matplotlib
-matplotlib.use('Agg')
-
 from demo import obtener_datos_demo
 
 

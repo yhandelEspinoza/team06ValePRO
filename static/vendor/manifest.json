@@ -1,13 +1,13 @@
 [
   {
-    "file": "chart.umd.min.js",
-    "source": "https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js",
-    "sha256": "48444a82d4edcb5bec0f1965faacdde18d9c17db3063d042abada2f705c9f54a"
+    "file": "plotly.min.js",
+    "source": "Plotly 7.1.0 Python distribution (plotly.js 4.1.1 bundle)",
+    "sha256": "db76c3cbf87ba68600a5a83946591ab41d818275ffa5dd4decf95fece32b6913"
   },
   {
-    "file": "chart-LICENSE.md",
-    "source": "https://cdn.jsdelivr.net/npm/chart.js@4.5.1/LICENSE.md",
-    "sha256": "41a84aa2caba645f966a18d9c2056b73e6d3a81d80bc0046bc0011a2634d4cce"
+    "file": "plotly-LICENSE.txt",
+    "source": "Plotly 7.1.0 Python distribution (plotly.js 4.1.1 bundle)",
+    "sha256": "ba712274f8336a5f0828c8e2bf639ab8a632c623800a35f96c8b0a67b5f2ab40"
   },
   {
     "file": "bootstrap-icons/bootstrap-icons.min.css",

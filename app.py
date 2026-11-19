@@ -1,5 +1,6 @@
 """Dashboard VALPRO: lectura, análisis y presentación; sin escrituras a Sheets."""
 import os
+import json
 from datetime import datetime
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
@@ -13,6 +14,11 @@ from analisis import (
     agrupar_por_categoria, calcular_monto_por_categoria,
     obtener_estado_predominante, obtener_area_mas_solicitudes,
     obtener_categoria_mas_usada,
+)
+from graficos import (
+    grafico_solicitudes_por_estado, grafico_solicitudes_por_area,
+    grafico_solicitudes_por_categoria, grafico_monto_por_categoria,
+    grafico_distribucion_estados,
 )
 
 app = Flask(__name__)
@@ -76,6 +82,7 @@ def dashboard():
         categorias_labels=[], categorias_valores=[],
         montos_categoria_labels=[], montos_categoria_valores=[],
         montos_disponibles=False,
+        figuras={},
         ultima_actualizacion=datetime.now(ZoneInfo("America/Lima")).strftime("%d/%m/%Y %H:%M:%S (Lima)"),
     )
     status = 200
@@ -123,6 +130,17 @@ def dashboard():
         ]:
             contexto[prefijo + "_labels"] = list(datos)
             contexto[prefijo + "_valores"] = list(datos.values())
+        figuras = {
+            "estados": grafico_solicitudes_por_estado(solicitudes),
+            "categorias": grafico_solicitudes_por_categoria(solicitudes),
+            "distribucion_estados": grafico_distribucion_estados(solicitudes),
+            "areas": grafico_solicitudes_por_area(solicitudes),
+            "montos": grafico_monto_por_categoria(solicitudes) if contexto["montos_disponibles"] else None,
+        }
+        contexto["figuras"] = {
+            clave: json.loads(figura.to_json()) if figura is not None else None
+            for clave, figura in figuras.items()
+        }
         contexto.update(conexion_correcta=True, avisos=avisos, indicadores=indicadores,
                         destacados=destacados,
                         registros=enriquecer_solicitudes_con_firmas(solicitudes, firmas))

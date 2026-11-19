@@ -30,3 +30,11 @@ El puerto 5001 evita interferir con el servicio actual. Los ejemplos `deploy/` m
 La computadora de exposición solo necesitará navegador cuando se habilite una URL HTTPS con autenticación. Actualmente no existe esa URL. Comprobar previamente acceso/login, siete KPI, cuatro gráficos, filtros, modales y consola del navegador. Si Sheets falla, usar una instancia de demostración separada con `VALPRO_DEMO=1` y comprobar que el aviso «DATOS FICTICIOS» sea visible. No exponer información real sin autenticación.
 
 Las reglas de datos se documentan en `docs/DATOS.md`.
+
+## Gráficos Plotly y demostración docente
+
+Flujo: **Google Sheets → `conexion_sheets.py` (gspread y google-auth) → `analisis.py` (limpieza, KPI y agrupaciones) → `graficos.py` (figuras Plotly Graph Objects) → `app.py` (JSON de figuras) → `dashboard.html` y `static/js/dashboard.js` (Plotly.js en el navegador)**. Los cuatro gráficos visibles representan estado, categoría, área y monto por categoría. El selector de la segunda tarjeta también muestra la distribución por estado. Todas las figuras parten de los registros procesados en Python, sin valores fijos en JavaScript.
+
+Se usa Graph Objects porque Plotly Express 7.1 requiere Pandas al recibir listas; esta aplicación ya obtiene agrupaciones simples en Python y no necesita una dependencia de tablas. El navegador carga el paquete Plotly.js local incluido en `static/vendor/`, sin CDN. No se cargan otros motores de gráficos.
+
+Para demostrarlo sin credenciales: instale las dependencias, active `VALPRO_DEMO=1` y ejecute `app.py`. Muestre el aviso «DATOS FICTICIOS», los siete KPI y los cuatro gráficos. En las herramientas de desarrollo del navegador, compruebe `window.Plotly` y el elemento `#plotly-data`; este contiene las figuras serializadas por Flask. Cambie el selector «Agrupar por» y verifique el tema, la búsqueda, los filtros y el botón Limpiar. Ejecute `python -m pytest -q`; las pruebas validan tipos, trazas y sumas reales de las figuras, además de la respuesta Flask. Para datos reales use una cuenta autorizada de Sheets y nunca exponga `credenciales.json`.

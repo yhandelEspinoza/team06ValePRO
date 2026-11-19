@@ -30,8 +30,13 @@ def test_dashboard_y_cuatro_series(web):
         assert sum(ctx[tipo+'_valores'])==4
         assert len(ctx[tipo+'_labels'])==len(ctx[tipo+'_valores'])
     assert sum(ctx['montos_categoria_valores'])==550.75
-    assert response.text.count('<canvas ')==4
-    assert 'data-categorias-valores' in response.text
+    assert response.text.count('class="grafico-plotly"')==4
+    assert all(ctx['figuras'][clave]['data'] for clave in ('estados','areas','categorias','montos'))
+    for clave in ('estados', 'areas', 'categorias'):
+        traza = ctx['figuras'][clave]['data'][0]
+        assert sum(traza['values'] if traza['type'] == 'pie' else traza['y']) == 4
+    assert sum(ctx['figuras']['montos']['data'][0]['y']) == 550.75
+    assert 'id="plotly-data"' in response.text
     assert 'Cache-Control' in response.headers and response.headers['Cache-Control']=='no-store'
 
 
@@ -42,7 +47,7 @@ def test_fallo_sheets_no_muestra_ceros(web,monkeypatch):
     response,ctx=capturar(web)
     assert response.status_code==503 and not ctx['conexion_correcta']
     assert 'No se puede conectar' in response.text
-    assert 'class="contenido-kpi"' not in response.text and '<canvas ' not in response.text
+    assert 'class="contenido-kpi"' not in response.text and 'id="plotly-data"' not in response.text
 
 
 def test_fallo_interno_no_expone_detalles(web,monkeypatch):
@@ -61,6 +66,7 @@ def test_monto_invalido_conserva_conteos(web,monkeypatch,registros):
     assert ctx['indicadores']['monto_total'] is None
     assert ctx['indicadores']['monto_promedio'] is None
     assert ctx['montos_categoria_valores']==[] and not ctx['montos_disponibles']
+    assert ctx['figuras']['montos'] is None
     assert 'No disponible' in response.text
 
 
@@ -113,6 +119,6 @@ def test_escapado_html(web,registros):
     assert '&lt;script&gt;' in response.text
 
 
-@pytest.mark.parametrize('recurso',['css/estilo.css','js/dashboard.js','favicon.svg','vendor/chart.umd.min.js','vendor/bootstrap-icons/bootstrap-icons.min.css','vendor/bootstrap-icons/fonts/bootstrap-icons.woff2'])
+@pytest.mark.parametrize('recurso',['css/estilo.css','js/dashboard.js','favicon.svg','vendor/plotly.min.js','vendor/bootstrap-icons/bootstrap-icons.min.css','vendor/bootstrap-icons/fonts/bootstrap-icons.woff2'])
 def test_estaticos(web,recurso):
     assert web.get('/static/'+recurso).status_code==200
