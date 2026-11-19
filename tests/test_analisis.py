@@ -82,3 +82,37 @@ def test_monto_invalido_impide_total_parcial():
 def test_total_fuera_de_rango():
     with pytest.raises(MontoInvalido):
         calcular_monto_total([{'Monto':1e308},{'Monto':1e308}])
+
+
+@pytest.mark.parametrize('fn', [
+    preparar_solicitudes, contar_solicitudes, contar_por_estado,
+    calcular_monto_total, calcular_monto_promedio, agrupar_por_area,
+    agrupar_por_categoria, calcular_monto_por_categoria,
+    obtener_estado_predominante, obtener_area_mas_solicitudes,
+    obtener_categoria_mas_usada,
+])
+@pytest.mark.parametrize('entrada', [None, 'texto', {'Monto': 5}, [None], [{'Área': []}]])
+def test_estructura_invalida_se_rechaza(fn, entrada):
+    with pytest.raises(DatosInvalidos):
+        fn(entrada)
+
+
+def test_contar_estado_rechaza_filas_invalidas():
+    with pytest.raises(DatosInvalidos):
+        contar_estado([None], 'APROBADO')
+
+
+def test_campos_ausentes_tienen_reglas_explicitas():
+    filas, avisos = preparar_solicitudes([{'Código': 'A', 'Monto': 10}])
+    assert filas[0]['Estado'] == 'SIN ESTADO'
+    assert filas[0]['Área'] == 'SIN ÁREA'
+    assert filas[0]['Categoría'] == 'SIN CATEGORÍA'
+    assert calcular_monto_total(filas) == 10
+    assert any('otros estados' in aviso for aviso in avisos)
+    with pytest.raises(MontoInvalido):
+        calcular_monto_total([{'Código': 'B'}])
+
+
+def test_decimal_snan_es_error_de_monto_controlado():
+    with pytest.raises(MontoInvalido):
+        normalizar_monto(Decimal('sNaN'))

@@ -1,5 +1,6 @@
 """Análisis VALPRO, Equipo 06. Funciones puras; políticas en docs/DATOS.md."""
 from collections import Counter
+from collections.abc import Mapping
 from decimal import Decimal
 import math
 import re
@@ -11,6 +12,23 @@ class DatosInvalidos(ValueError):
 
 class MontoInvalido(DatosInvalidos):
     pass
+
+
+def _validar_registros(registros):
+    """Materializa filas y rechaza estructuras que no representan solicitudes."""
+    if isinstance(registros, (str, bytes, Mapping)):
+        raise DatosInvalidos("Las solicitudes deben ser una colección de registros.")
+    try:
+        filas = list(registros)
+    except TypeError as exc:
+        raise DatosInvalidos("Las solicitudes deben ser una colección de registros.") from exc
+    for fila in filas:
+        if not isinstance(fila, dict):
+            raise DatosInvalidos("Se recibió una fila que no es un registro válido.")
+        if any(not isinstance(clave, str) or isinstance(valor, (list, tuple, set, Mapping))
+               for clave, valor in fila.items()):
+            raise DatosInvalidos("Se recibió un campo con tipo de dato no válido.")
+    return filas
 
 
 def texto_limpio(valor):
@@ -58,8 +76,10 @@ def normalizar_monto(valor):
                         raise MontoInvalido("Monto ambiguo: use dos decimales o un número sin separador de miles.")
                     texto = texto.replace(separador, ".")
             numero = float(Decimal(signo + texto))
-    except OverflowError:
-        raise MontoInvalido("Monto fuera de rango.") from None
+    except MontoInvalido:
+        raise
+    except (OverflowError, ValueError, TypeError) as exc:
+        raise MontoInvalido("Monto no numérico o fuera de rango.") from exc
     if not math.isfinite(numero):
         raise MontoInvalido("El monto debe ser finito.")
     return numero
@@ -69,9 +89,7 @@ def preparar_solicitudes(registros):
     """Copia filas, omite vacías y repetidas idénticas; rechaza conflictos."""
     resultado, por_codigo, avisos = [], {}, []
     vacias = duplicadas = sin_codigo = 0
-    for original in registros:
-        if not isinstance(original, dict):
-            raise DatosInvalidos("Se recibió una fila que no es un registro válido.")
+    for original in _validar_registros(registros):
         if not any(texto_limpio(v) for v in original.values()):
             vacias += 1
             continue
@@ -105,11 +123,11 @@ def preparar_solicitudes(registros):
 
 
 def contar_solicitudes(registros):
-    return len(registros)
+    return len(_validar_registros(registros))
 
 
 def contar_por_estado(registros):
-    return dict(Counter(normalizar_estado(r.get("Estado")) for r in registros))
+    return dict(Counter(normalizar_estado(r.get("Estado")) for r in _validar_registros(registros)))
 
 
 def contar_estado(registros, estado_buscado):
@@ -117,7 +135,7 @@ def contar_estado(registros, estado_buscado):
 
 
 def calcular_monto_total(registros):
-    total = sum((Decimal(str(normalizar_monto(r.get("Monto")))) for r in registros), Decimal(0))
+    total = sum((Decimal(str(normalizar_monto(r.get("Monto")))) for r in _validar_registros(registros)), Decimal(0))
     resultado = float(total)
     if not math.isfinite(resultado):
         raise MontoInvalido("El total de montos excede el rango admitido.")
@@ -125,11 +143,12 @@ def calcular_monto_total(registros):
 
 
 def calcular_monto_promedio(registros):
-    return calcular_monto_total(registros) / len(registros) if registros else 0.0
+    filas = _validar_registros(registros)
+    return calcular_monto_total(filas) / len(filas) if filas else 0.0
 
 
 def _agrupar(registros, campo, vacio):
-    return dict(Counter(texto_limpio(r.get(campo)) or vacio for r in registros))
+    return dict(Counter(texto_limpio(r.get(campo)) or vacio for r in _validar_registros(registros)))
 
 
 def agrupar_por_area(registros):
@@ -142,7 +161,7 @@ def agrupar_por_categoria(registros):
 
 def calcular_monto_por_categoria(registros):
     grupos = {}
-    for r in registros:
+    for r in _validar_registros(registros):
         categoria = texto_limpio(r.get("Categoría")) or "SIN CATEGORÍA"
         grupos.setdefault(categoria, []).append(r)
     return {categoria: calcular_monto_total(filas) for categoria, filas in grupos.items()}

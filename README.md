@@ -30,6 +30,7 @@ El puerto 5001 evita interferir con el servicio actual. Los ejemplos `deploy/` m
 La computadora de exposición solo necesitará navegador cuando se habilite una URL HTTPS con autenticación. Actualmente no existe esa URL. Comprobar previamente acceso/login, siete KPI, cuatro gráficos, filtros, modales y consola del navegador. Si Sheets falla, usar una instancia de demostración separada con `VALPRO_DEMO=1` y comprobar que el aviso «DATOS FICTICIOS» sea visible. No exponer información real sin autenticación.
 
 Las reglas de datos se documentan en `docs/DATOS.md`.
+La auditoría de funciones, las parejas para integrantes y los comandos de demostración están en `docs/PROGRAMACION_ESTRUCTURADA.md`.
 
 ## Gráficos Plotly y demostración docente
 
